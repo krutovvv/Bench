@@ -40,6 +40,8 @@ pub const BLOCK_HEAD_H: f32 = 32.;
 pub const CHIP_H: f32 = FIELD_H;
 /// A row of a list inside a block (the changed files): a Mac list's medium row.
 pub const LIST_ROW_H: f32 = 26.;
+/// A long code block while folded: its first lines, with the line that unfolds it below.
+pub const CODE_FOLD_H: f32 = 140.;
 /// The thread's leading, in lines: messages and the composer share it.
 pub const LEAD: f32 = 1.5;
 /// The code editor's leading, Zed's "comfortable" (1.618 × the font): the library's 1.5 set code

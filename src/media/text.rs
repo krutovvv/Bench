@@ -219,7 +219,6 @@ fn answer_style(view: TextView, cx: &App) -> TextView {
 /// A code block taller than this shows its first lines and a “Show all” line: a log dump must
 /// not take the window when nobody is going to read it.
 pub(crate) const FOLD_AFTER_LINES: usize = 10;
-pub(super) const FOLD_PREVIEW_H: f32 = 140.;
 
 /// A code block in an answer, as chat UIs show one: a header with the language on the left and
 /// a copy button on the right, the highlighted code under it (one frame around both). A long one
@@ -251,38 +250,26 @@ pub(crate) fn render_code(
                 ),
         );
     let copy = code.trim_end_matches('\n').to_string();
-    bench_ui::block_frame(cx)
-        .child(
-            // As tall as the changed-files card's line: small text, 4 above and below.
-            bench_ui::block_head(&theme, true)
-                .justify_between()
-                .child(if lang.is_empty() {
-                    "code".to_string()
-                } else {
-                    lang
-                })
-                .child(
-                    bench_ui::icon_button(
-                        SharedString::from(format!("code-copy-{i}-{k}")),
-                        Ico::Copy,
-                        "Copy",
-                        false,
-                        cx,
-                    )
-                    .on_click(move |_, window, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
-                            window.push_notification(
-                                (NotificationType::Success, SharedString::from("Copied")),
-                                cx,
-                            );
-                        }),
-                ),
+    bench_ui::code_frame(
+        if lang.is_empty() { "code".to_string() } else { lang },
+        bench_ui::icon_button(
+            SharedString::from(format!("code-copy-{i}-{k}")),
+            Ico::Copy,
+            "Copy",
+            false,
+            cx,
         )
-        .child(
-            div()
-                .when(folded, |d| d.max_h(px(FOLD_PREVIEW_H)).overflow_hidden())
-                .child(body),
-        )
-        .when_some(more, |d, m| d.child(m))
-        .into_any_element()
+        .on_click(move |_, window, cx| {
+            cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
+            window.push_notification(
+                (NotificationType::Success, SharedString::from("Copied")),
+                cx,
+            );
+        }),
+        body,
+        folded,
+        more,
+        cx,
+    )
+    .into_any_element()
 }

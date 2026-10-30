@@ -87,21 +87,12 @@ impl BenchApp {
                     let more = long.then(|| {
                         let k2 = state_key.clone();
                         let n = code.lines().count();
-                        div()
-                            .id(SharedString::from(format!("code-more-{key}-{k}")))
-                            .px_3()
-                            .py_1()
+                        bench_ui::fold_foot(
+                            SharedString::from(format!("code-more-{key}-{k}")),
+                            bench_ui::fold_words(open, format!("Show all · {n} lines")),
+                            cx,
+                        )
                             .text_base()
-                            .text_color(cx.theme().muted_foreground)
-                            .border_t_1()
-                            .border_color(cx.theme().border)
-                            .cursor_pointer()
-                            .hover(|s| s.text_color(cx.theme().foreground))
-                            .child(if open {
-                                "Show less".to_string()
-                            } else {
-                                format!("Show all · {n} lines")
-                            })
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 if !this.media.open.remove(&k2) {
                                     this.media.open.insert(k2.clone());
@@ -493,17 +484,8 @@ impl BenchApp {
                     )
                     .when(long, |d| {
                         d.child(
-                            div()
-                                .id(id("more"))
-                                .px_3()
-                                .py_1()
+                            bench_ui::fold_foot(id("more"), bench_ui::fold_words(open, "Show all"), cx)
                                 .text_base()
-                                .text_color(theme.muted_foreground)
-                                .border_t_1()
-                                .border_color(theme.border)
-                                .cursor_pointer()
-                                .hover(|s| s.text_color(theme.foreground))
-                                .child(if open { "Show less" } else { "Show all" })
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     if !this.media.open.remove(&k2) {
                                         this.media.open.insert(k2.clone());

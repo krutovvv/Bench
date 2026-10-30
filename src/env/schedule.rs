@@ -293,13 +293,7 @@ impl ExplorerParts for Schedule {
             pad(v_flex()
                 .child(Input::new(&e.cron.name))
                 .child(Input::new(&e.cron.schedule))
-                .child(
-                    div()
-                        .border_1()
-                        .rounded_md()
-                        .border_color(theme.border)
-                        .child(code(&e.cron.prompt, cx)),
-                )
+                .child(bench_ui::editor_frame(cx).child(code(&e.cron.prompt, cx)))
                 .children(last)),
             actions,
         ))

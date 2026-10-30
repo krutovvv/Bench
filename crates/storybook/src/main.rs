@@ -101,6 +101,13 @@ impl Render for Story {
             )
             .child(
                 row(Gap::M)
+                    .child(chip("ch1", cx).child("A preset to add"))
+                    .child(chip_tight("ch2", cx).child("example.com"))
+                    .child(fold_more("fo1", fold_words(false, "Show all"), cx))
+                    .child(fold_more("fo2", fold_words(true, "Show all"), cx)),
+            )
+            .child(
+                row(Gap::M)
                     .child(form_action("fa1", "Save", true, cx))
                     .child(form_action("fa2", "Revert", false, cx))
                     .child(compact_button("c", "Copy"))
@@ -144,6 +151,22 @@ impl Render for Story {
                 cx,
             ))
             .child(block("A block with a head only", vec![], None, cx))
+            .child(code_frame(
+                "bash",
+                icon_button("cf1", Ico::Copy, "Copy", false, cx),
+                mono(cx).p_3().child("cargo build"),
+                false,
+                Some(fold_foot("cf2", fold_words(false, "Show all · 40 lines"), cx).into_any_element()),
+                cx,
+            ))
+            .child(code_note("rm -rf target/debug/incremental", cx))
+            .child(editor_frame(cx).child(mono(cx).p_3().child("A code editor among a form's fields")))
+            .child(
+                v_flex()
+                    .w(px(POPOVER_M))
+                    .child(popover_section(false, cx).child(popover_title("A popover's section", cx)))
+                    .child(popover_section(true, cx).child(popover_title("And the next", cx))),
+            )
             .child(
                 row(Gap::M)
                     .child(avatar(false, &theme))
@@ -170,13 +193,29 @@ impl Render for Story {
                 "Light, dark or as the system",
                 segmented(
                     "seg",
-                    &["Light".into(), "Dark".into(), "System".into()],
+                    ["Light", "Dark", "System"],
                     self.picked,
                     cx,
-                    pick,
+                    pick.clone(),
                 )
                 .into_any_element(),
                 cx,
+            ))
+            .child(settings_card(
+                "A server",
+                Some(("main".into(), cx.theme().primary)),
+                vec![settings_field("Name", "How it is listed", field(&self.name).into_any_element(), cx).into_any_element()],
+                Some((false, "Doesn't answer".into())),
+                vec![primary_button("sc1", "Save").into_any_element()],
+                cx,
+            ))
+            .child(settings_add("sc2", "Add a server…", cx))
+            .child(segmented_cells(
+                "seg-cells",
+                ["JSON", "YAML"],
+                self.picked.min(1),
+                cx,
+                pick,
             ))
             .child(
                 settings_tabs(

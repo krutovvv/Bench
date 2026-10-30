@@ -321,17 +321,12 @@ impl ThreadView {
                     let opened = self.thread.open_fields.contains(&id);
                     let more = long.then(|| {
                         let id = id.clone();
-                        div()
-                            .id(SharedString::from(format!("{id}-more")))
-                            .px_3()
-                            .py_1()
+                        bench_ui::fold_foot(
+                            SharedString::from(format!("{id}-more")),
+                            bench_ui::fold_words(opened, format!("Show all · {lines} lines")),
+                            cx,
+                        )
                             .text_size(px(bench_ui::THREAD_DETAIL))
-                            .text_color(theme.muted_foreground)
-                            .border_t_1()
-                            .border_color(theme.border)
-                            .cursor_pointer()
-                            .hover(|s| s.text_color(theme.foreground))
-                            .child(if opened { "Show less".to_string() } else { format!("Show all · {lines} lines") })
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.claim_click(cx);
                                 if !this.thread.open_fields.remove(&id) {
@@ -363,13 +358,12 @@ impl ThreadView {
                         .child(div().text_size(px(bench_ui::THREAD_META)).child(text))
                         .when(cut || whole, |d| {
                             d.child(
-                                div()
-                                    .id(SharedString::from(format!("{id}-more")))
+                                bench_ui::fold_more(
+                                    SharedString::from(format!("{id}-more")),
+                                    bench_ui::fold_words(whole, "Show all"),
+                                    cx,
+                                )
                                     .text_size(px(bench_ui::THREAD_DETAIL))
-                                    .text_color(theme.muted_foreground)
-                                    .cursor_pointer()
-                                    .hover(|s| s.text_color(theme.foreground))
-                                    .child(if whole { "Show less" } else { "Show all" })
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.claim_click(cx);
                                         if !this.thread.step_whole.remove(&toggle) {

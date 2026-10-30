@@ -354,14 +354,7 @@ impl ThreadView {
             })
             .child(head)
             .when_some(card.detail.clone(), |d, cmd| {
-                d.child(
-                    div()
-                        .p_2()
-                        .bg(theme.secondary)
-                        .font_family(bench_ui::theme::MONO)
-                        .text_size(px(bench_ui::THREAD_META))
-                        .child(cmd),
-                )
+                d.child(bench_ui::code_note(cmd, cx))
             })
             .child(body)
             .into_any_element()

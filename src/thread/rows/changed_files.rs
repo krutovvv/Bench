@@ -230,16 +230,12 @@ impl ThreadView {
         if open && hidden > 0 {
             let k = key.to_string();
             rows.push(
-                h_flex()
-                    .id(SharedString::from(format!("chg-all-{key}")))
-                    .h(px(bench_ui::LIST_ROW_H))
-                    .px_3()
-                    .items_center()
+                bench_ui::fold_row(
+                    SharedString::from(format!("chg-all-{key}")),
+                    if all { "Show fewer".to_string() } else { format!("Show all {count}") },
+                    cx,
+                )
                     .text_size(px(bench_ui::THREAD_META))
-                    .text_color(theme.muted_foreground)
-                    .cursor_pointer()
-                    .hover(|s| s.text_color(theme.foreground))
-                    .child(if all { "Show fewer".to_string() } else { format!("Show all {count}") })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         if !this.thread.files_all.remove(&k) {
                             this.thread.files_all.insert(k.clone());

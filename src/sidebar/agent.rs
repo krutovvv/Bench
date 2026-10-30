@@ -142,14 +142,10 @@ impl BenchApp {
                                 // Whatever a line holds, the panel keeps it in: nothing paints
                                 // over its edge.
                                 .overflow_hidden()
-                                .child(
+                                .child(bench_ui::popover_section(false, cx).child(
                                     h_flex()
-                                        .px_3()
-                                        .py_2()
                                         .gap_2()
                                         .items_start()
-                                        .border_b_1()
-                                        .border_color(theme.border.opacity(0.6))
                                         .child(v_flex().flex_1().min_w_0().gap_1().children(lines))
                                         .child(
                                             icon("backend-reconnect", Ico::RefreshCw, "Reconnect")
@@ -176,7 +172,7 @@ impl BenchApp {
                                                 },
                                             ),
                                         ),
-                                )
+                                ))
                                 // Whether macOS lets Bench speak at all: the one thing that
                                 // stands between "the agent finished" and silence.
                                 .child({
@@ -184,21 +180,13 @@ impl BenchApp {
                                     let w = view.clone();
                                     let auth = crate::system::notify::AUTH
                                         .load(std::sync::atomic::Ordering::Relaxed);
-                                    v_flex()
-                                        .px_3()
-                                        .py_2()
+                                    bench_ui::popover_section(true, cx)
                                         .gap_1()
                                         .child(
                                             h_flex()
                                                 .gap_2()
                                                 .items_center()
-                                                .child(
-                                                    div()
-                                                        .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
-                                                        .font_weight(FontWeight::SEMIBOLD)
-                                                        .text_color(muted)
-                                                        .child("Notifications"),
-                                                )
+                                                .child(bench_ui::popover_title("Notifications", cx))
                                                 .child(div().flex_1())
                                                 .child(
                                                     icon(
@@ -246,19 +234,9 @@ impl BenchApp {
                                 // Its own log: the last lines of ~/.bench/server.log, where a
                                 // problem says itself before the status has anything to say.
                                 .child(
-                                    v_flex()
-                                        .px_3()
-                                        .py_2()
+                                    bench_ui::popover_section(true, cx)
                                         .gap_px()
-                                        .border_t_1()
-                                        .border_color(theme.border.opacity(0.6))
-                                        .child(
-                                            div()
-                                                .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
-                                                .font_weight(FontWeight::SEMIBOLD)
-                                                .text_color(muted)
-                                                .child("Log · ~/.bench/server.log"),
-                                        )
+                                        .child(bench_ui::popover_title("Log · ~/.bench/server.log", cx))
                                         .when(log.is_empty(), |d| {
                                             d.child(
                                                 div()
@@ -288,11 +266,7 @@ impl BenchApp {
                                         })),
                                 )
                                 .child(
-                                    div()
-                                        .px_3()
-                                        .py_2()
-                                        .border_t_1()
-                                        .border_color(theme.border.opacity(0.6))
+                                    bench_ui::popover_section(true, cx)
                                         .text_size(px(bench_ui::SIDEBAR_TEXT))
                                         .text_color(muted)
                                         .whitespace_normal()
