@@ -32,11 +32,6 @@ fn seed(hooks: &DemoHooks, app: &mut BenchApp, window: &mut Window, cx: &mut Con
     if let Some(key) = &hooks.arm {
         app.armed.arm(key.clone());
     }
-    app.sidebar.held_drop = hooks.drop_line.as_ref().and_then(|spec| {
-        let (group, edge) = spec.split_once(':')?;
-        let edge = if edge == "above" { bench_ui::DropEdge::Above } else { bench_ui::DropEdge::Below };
-        Some((group.parse().ok()?, edge))
-    });
     if hooks.pop.as_deref() == Some("agent") {
         app.sidebar.agent_popover_open = true;
         app.sidebar.agent_log = crate::client::fake::fake().map(|f| f.agent_log()).unwrap_or_default();
@@ -482,6 +477,9 @@ fn presses(hooks: &'static DemoHooks, window: &mut Window, cx: &mut Context<Benc
     }
     if let Some(where_) = hooks.drop.clone() {
         super::probes::drop_file(where_, window, cx);
+    }
+    if let Some(spec) = hooks.drag.clone() {
+        super::probes::drag(&spec, window, cx);
     }
     if let Some(at) = hooks.click.clone() {
         super::probes::click(&at, window, cx);

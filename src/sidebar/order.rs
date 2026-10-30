@@ -9,18 +9,8 @@ use gpui_kit::*;
 use bench_ui::Gap;
 
 use crate::app::BenchApp;
+use crate::app::model::ProjectKey;
 use crate::client::connection;
-
-/// Where a dragged project goes among the ones on screen.
-#[derive(Clone, Debug)]
-pub enum ProjectPlace {
-    /// The front of the projects (under the Host, which is always first).
-    Front,
-    /// Above or below another project's group, as the pointer was over it.
-    On(String, bench_ui::DropEdge),
-    /// Past the last group: the end of the list.
-    Last,
-}
 
 /// A project held in the air: the row that follows the cursor while its group is dragged, the
 /// head's own look in a card (as a dragged document tab is that tab in a card).
@@ -34,15 +24,12 @@ pub struct DraggedProject {
 
 impl Render for DraggedProject {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
-        bench_ui::row(Gap::S)
+        let theme = cx.theme().clone();
+        bench_ui::drag_card(cx)
+            .gap(Gap::S)
             .pl(px(bench_ui::SIDEBAR_TEXT_X))
             .pr(px(bench_ui::SIDEBAR_ROW_INSET))
             .py(px(bench_ui::GROUP_HEAD_PB))
-            .rounded_md()
-            .border_1()
-            .border_color(theme.border)
-            .bg(theme.popover)
             .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(theme.muted_foreground)
@@ -98,48 +85,25 @@ impl BenchApp {
     }
 
     /// A group of projects as a place the project in the air lands against: the pointer's half of
-    /// it says the edge (`bench_ui::drop_edge`), and letting go takes that place.
+    /// it says the edge (`bench_ui::drop_edge`). The Host, always first, only takes it under itself.
     pub fn drop_zone(
         &mut self,
         zone: Stateful<Div>,
         onto: String,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let over = onto.clone();
-        zone.on_drag_move::<DraggedProject>(cx.listener(
-            move |this, ev: &DragMoveEvent<DraggedProject>, _, cx| {
-                if !ev.bounds.contains(&ev.event.position) {
-                    return;
-                }
-                let edge = bench_ui::drop_edge(ev.event.position.y, &ev.bounds);
-                this.drag_over_project(&over, edge, cx);
-            },
-        ))
-        .on_drop(cx.listener(move |this, d: &DraggedProject, _, cx| {
-            let edge = this
-                .drop_edge_over(&onto)
-                .unwrap_or(bench_ui::DropEdge::Below);
-            this.drop_project(&d.id, ProjectPlace::On(onto.clone(), edge), cx);
-        }))
-    }
-
-    /// The Host's group: always first, so the project in the air lands under it, the first place.
-    pub fn first_place_zone(
-        &mut self,
-        zone: Stateful<Div>,
-        host: String,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
         zone.on_drag_move::<DraggedProject>(cx.listener(
             move |this, ev: &DragMoveEvent<DraggedProject>, _, cx| {
                 if ev.bounds.contains(&ev.event.position) {
-                    this.drag_over_project(&host, bench_ui::DropEdge::Below, cx);
+                    let edge = if onto == ProjectKey::HOST {
+                        bench_ui::DropEdge::Below
+                    } else {
+                        bench_ui::drop_edge(ev.event.position.y, &ev.bounds)
+                    };
+                    this.drag_over_project(&onto, edge, cx);
                 }
             },
         ))
-        .on_drop(cx.listener(|this, d: &DraggedProject, _, cx| {
-            this.drop_project(&d.id, ProjectPlace::Front, cx);
-        }))
     }
 
     /// The room under the last group: the project in the air lands past it, and the line says so
@@ -156,21 +120,84 @@ impl BenchApp {
                     }
                 },
             ))
-            .on_drop(cx.listener(|this, d: &DraggedProject, _, cx| {
-                this.drop_project(&d.id, ProjectPlace::Last, cx);
-            }))
             .into_any_element()
+    }
+
+    /// The list as what the project in the air moves over: out of it no line says it lands, near
+    /// its top or bottom edge it scrolls, and let go anywhere in it, the project takes the place
+    /// the line shows.
+    pub fn drag_list(&mut self, list: Stateful<Div>, cx: &mut Context<Self>) -> Stateful<Div> {
+        list.on_drag_move::<DraggedProject>(cx.listener(
+            |this, ev: &DragMoveEvent<DraggedProject>, window, cx| {
+                if !ev.bounds.contains(&ev.event.position) && this.sidebar.drop.take().is_some() {
+                    cx.notify();
+                }
+                this.scroll_at_edge(ev.event.position.y, &ev.bounds, window, cx);
+            },
+        ))
+        .on_drop(cx.listener(|this, d: &DraggedProject, _, cx| {
+            this.sidebar.drag_scroll = None;
+            if let Some((onto, edge)) = this.sidebar.drop.take() {
+                this.drop_project(&d.id, &onto, edge, cx);
+            }
+        }))
+    }
+
+    /// While the pointer stays near an edge of the list, it scrolls that way. The list moves under
+    /// a still pointer, so each step is told as a move: the line follows what is under it now.
+    fn scroll_at_edge(&mut self, y: Pixels, list: &Bounds<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let edge = px(bench_ui::DRAG_SCROLL_EDGE);
+        let way = if y < list.top() || y > list.bottom() {
+            0.
+        } else if y < list.top() + edge {
+            1.
+        } else if y > list.bottom() - edge {
+            -1.
+        } else {
+            0.
+        };
+        if self.sidebar.drag_scroll.as_ref().map_or(0., |(w, _)| *w) == way {
+            return;
+        }
+        let task = cx.spawn_in(window, async move |this, cx| {
+            loop {
+                cx.background_executor().timer(std::time::Duration::from_millis(16)).await;
+                let live = this.update(cx, |this, cx| {
+                    let list = &this.sidebar.scroll;
+                    let mut at = list.offset();
+                    at.y = (at.y + px(way * bench_ui::DRAG_SCROLL_STEP)).clamp(-list.max_offset().y, px(0.));
+                    list.set_offset(at);
+                    cx.notify();
+                    let live = cx.has_active_drag();
+                    if !live {
+                        this.sidebar.drag_scroll = None;
+                    }
+                    live
+                });
+                if !matches!(live, Ok(true)) {
+                    return;
+                }
+                let _ = cx.update(|window, cx| {
+                    let moved = MouseMoveEvent {
+                        position: window.mouse_position(),
+                        pressed_button: Some(MouseButton::Left),
+                        modifiers: window.modifiers(),
+                    };
+                    window.dispatch_event(PlatformInput::MouseMove(moved), cx);
+                });
+            }
+        });
+        self.sidebar.drag_scroll = (way != 0.).then_some((way, task));
     }
 
     /// The project `from` takes the place it was dropped in, and every project on screen then
     /// keeps the place the person has given it: from that drop on, the list is theirs and not
     /// what the sources happened to return. Those not on screen (an agent still connecting) keep
     /// theirs, after these.
-    pub fn drop_project(&mut self, from: &str, at: ProjectPlace, cx: &mut Context<Self>) {
-        self.sidebar.drop = None;
+    fn drop_project(&mut self, from: &str, onto: &str, edge: bench_ui::DropEdge, cx: &mut Context<Self>) {
         let (_, groups) = self.sidebar_groups();
         let ids: Vec<String> = groups.into_iter().map(|(p, _)| p.id).collect();
-        if let Some(order) = placed(&ids, from, &at) {
+        if let Some(order) = placed(&ids, from, onto, edge) {
             let away = self.sidebar.order.iter().filter(|id| !ids.contains(id)).cloned();
             self.sidebar.order = order.into_iter().chain(away.collect::<Vec<_>>()).collect();
             let _ = std::fs::create_dir_all(connection::state_dir());
@@ -180,52 +207,47 @@ impl BenchApp {
     }
 }
 
-/// The projects `ids` with `from` at the place `at`; None: nothing moves, as it is not there (a
-/// project removed meanwhile) or it was let go over itself.
-fn placed(ids: &[String], from: &str, at: &ProjectPlace) -> Option<Vec<String>> {
-    if matches!(at, ProjectPlace::On(onto, _) if onto == from) {
+/// The projects `ids` with `from` at the given edge of `onto`, the Host's edge being the first
+/// place; None: nothing moves, as it is not there (a project removed meanwhile) or it was let go
+/// over itself.
+fn placed(ids: &[String], from: &str, onto: &str, edge: bench_ui::DropEdge) -> Option<Vec<String>> {
+    if onto == from {
         return None;
     }
     let mut ids = ids.to_vec();
     let moving = ids.iter().position(|i| i == from)?;
     ids.remove(moving);
-    let to = match at {
-        ProjectPlace::Front => 0,
-        ProjectPlace::Last => ids.len(),
-        ProjectPlace::On(onto, edge) => {
-            let k = ids.iter().position(|i| i == onto).unwrap_or(ids.len());
-            if *edge == bench_ui::DropEdge::Below { k + 1 } else { k }
-        }
+    let to = match ids.iter().position(|i| i == onto) {
+        Some(k) if edge == bench_ui::DropEdge::Below => k + 1,
+        Some(k) => k,
+        None => 0,
     };
-    ids.insert(to.min(ids.len()), from.to_string());
+    ids.insert(to, from.to_string());
     Some(ids)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ProjectPlace, placed};
+    use super::placed;
     use bench_ui::DropEdge::{Above, Below};
+    use crate::app::model::ProjectKey;
 
     fn ids() -> Vec<String> {
         ["a", "b", "c"].map(String::from).to_vec()
     }
 
-    fn on(id: &str, edge: bench_ui::DropEdge) -> ProjectPlace {
-        ProjectPlace::On(id.into(), edge)
-    }
-
     #[test]
     fn a_project_lands_where_it_was_let_go() {
-        assert_eq!(placed(&ids(), "c", &ProjectPlace::Front).unwrap(), ["c", "a", "b"]);
-        assert_eq!(placed(&ids(), "a", &ProjectPlace::Last).unwrap(), ["b", "c", "a"]);
-        assert_eq!(placed(&ids(), "a", &on("b", Below)).unwrap(), ["b", "a", "c"]);
-        assert_eq!(placed(&ids(), "c", &on("b", Above)).unwrap(), ["a", "c", "b"]);
+        assert_eq!(placed(&ids(), "c", ProjectKey::HOST, Below).unwrap(), ["c", "a", "b"]);
+        assert_eq!(placed(&ids(), "a", "c", Below).unwrap(), ["b", "c", "a"]);
+        assert_eq!(placed(&ids(), "a", "b", Below).unwrap(), ["b", "a", "c"]);
+        assert_eq!(placed(&ids(), "c", "b", Above).unwrap(), ["a", "c", "b"]);
     }
 
     #[test]
     fn let_go_over_itself_or_gone_it_moves_nothing() {
-        assert_eq!(placed(&ids(), "b", &on("b", Above)), None);
-        assert_eq!(placed(&ids(), "b", &on("b", Below)), None);
-        assert_eq!(placed(&ids(), "x", &ProjectPlace::Front), None);
+        assert_eq!(placed(&ids(), "b", "b", Above), None);
+        assert_eq!(placed(&ids(), "b", "b", Below), None);
+        assert_eq!(placed(&ids(), "x", ProjectKey::HOST, Below), None);
     }
 }

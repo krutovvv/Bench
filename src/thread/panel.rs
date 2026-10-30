@@ -66,6 +66,11 @@ impl BenchApp {
         .bg(theme.title_bar);
         v_flex()
             .size_full()
+            // Only a file goes to the thread: another kind of tab finds no place here.
+            .can_drop(|d, _, _| {
+                d.downcast_ref::<crate::explorer::pane::tabs::DraggedTab>()
+                    .is_some_and(|t| matches!(t.key, crate::explorer::DocKey::File(_)))
+            })
             .drag_over::<crate::explorer::pane::tabs::DraggedTab>(|s, _, _, cx| {
                 s.bg(cx.theme().list_active)
             })

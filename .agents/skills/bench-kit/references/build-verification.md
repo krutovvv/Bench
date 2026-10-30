@@ -92,10 +92,10 @@ with `BENCH_DEMO` set.
 | `BENCH_DEMO_BESIDE` | `<thread id>` (`d-tool`) | That thread beside the open one |
 | `BENCH_DEMO_SEARCH` | `1`, words | ⌘K open, with those words typed |
 | `BENCH_DEMO_RENAME` | `<thread id>` | That thread being renamed |
-| `BENCH_DEMO_DROPLINE` | `<group>:above`, `<group>:below` | The sidebar's drop line over a project's group |
 | `BENCH_DEMO_POP` | `agent` | The agent's popover open, with long lines in its log |
 | `BENCH_DEMO_DROP` | `chat`, `between`, `right`, `foot`, `side`, `tint` | A file carried into the window there and dropped; `tint` held there, undropped |
 | `BENCH_DEMO_CLICK` | `<x>,<y>` | The left button pressed and let go there, two seconds in |
+| `BENCH_DEMO_DRAG` | `<x>,<y>:<x>,<y>[:hold]` | The left button pressed at the first place, carried to the second and let go there (`hold`: kept down, the picture shows the drag live). A real pointer moving over the copy can end it |
 | `BENCH_TOOLS_SHOWN` | `1` | The composer's hover tools shown at rest |
 
 Besides the demo: `BENCH_HOME=<a copy of ~/.bench>` runs on a copy of real data (its agent is started

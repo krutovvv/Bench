@@ -270,6 +270,9 @@ pub const SIDEBAR_FOOT_H: f32 = 40.;
 /// A mark's dot beside a name (Finder's tag).
 pub const TAG_DOT: f32 = 8.;
 
+/// How near a list's edge a row in the air scrolls the list, and how far at each step of 16 ms.
+pub const DRAG_SCROLL_EDGE: f32 = 28.;
+pub const DRAG_SCROLL_STEP: f32 = 6.;
 /// Where a row dragged in the sidebar will land: the line that says it (`drop_line`).
 pub const DROP_LINE: f32 = 2.;
 /// A group head's marks (a Telegram bot, a schedule): a step under the head's controls (12), so

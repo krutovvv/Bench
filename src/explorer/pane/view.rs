@@ -74,6 +74,7 @@ impl BenchApp {
                 crate::explorer::pane::tabs::DraggedTab {
                     key: key.clone(),
                     name: name.clone().into(),
+                    at: n,
                 },
                 key.clone(),
             );
@@ -88,8 +89,15 @@ impl BenchApp {
                     // Dragged onto another tab it takes that place; onto the thread, the file
                     // goes to it.
                     .on_drag(drag, |d, _, _, cx| cx.new(|_| d.clone()))
-                    .drag_over::<crate::explorer::pane::tabs::DraggedTab>(move |s, _, _, _| {
-                        s.border_l_2().border_color(primary)
+                    // It takes this tab's place: coming from the left it lands after it, from the
+                    // right before it, and the line says which (as Zed's tabs).
+                    .drag_over::<crate::explorer::pane::tabs::DraggedTab>(move |s, d, _, _| {
+                        match n.cmp(&d.at) {
+                            std::cmp::Ordering::Greater => s.border_color(primary).border_r_2(),
+                            // Its own hairline on the right takes the colour too: gone meanwhile.
+                            std::cmp::Ordering::Less => s.border_color(primary).border_l_2().border_r_0(),
+                            std::cmp::Ordering::Equal => s,
+                        }
                     })
                     .on_drop(
                         cx.listener(move |this, d: &crate::explorer::pane::tabs::DraggedTab, _, cx| {

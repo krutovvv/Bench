@@ -5,7 +5,7 @@
 
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::Sizable as _;
 use gpui_kit::*;
 use bench_ui::Gap;
 
@@ -20,20 +20,16 @@ use bench_ui::icons::Ico;
 pub struct DraggedTab {
     pub key: DocKey,
     pub name: SharedString,
+    /// Its place among the tabs on screen: a tab it is held over says on which side it will land.
+    pub at: usize,
 }
 
 impl Render for DraggedTab {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
-        h_flex()
+        bench_ui::drag_card(cx)
             .px(Gap::L)
             .py(Gap::Xs)
             .gap(Gap::S)
-            .items_center()
-            .rounded_md()
-            .border_1()
-            .border_color(theme.border)
-            .bg(theme.popover)
             .text_sm()
             .child(Ico::File.icon().small())
             .child(self.name.clone())

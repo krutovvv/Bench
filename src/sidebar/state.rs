@@ -32,8 +32,9 @@ pub struct SidebarState {
     /// The group the project in the air was last over, and at which edge of it: the line says so,
     /// and only while GPUI says a drag is live, so this never outlives one.
     pub drop: Option<(String, bench_ui::DropEdge)>,
-    /// A drop line held over a group whatever the pointer does (a picture of how it looks).
-    pub held_drop: Option<(usize, bench_ui::DropEdge)>,
+    /// The list's scroll, and the way it goes while a project is held near its edge (`order.rs`).
+    pub scroll: ScrollHandle,
+    pub drag_scroll: Option<(f32, Task<()>)>,
     /// The agent's popover opens with the window (a picture of it).
     pub agent_popover_open: bool,
     /// A thread or project being renamed in place.
@@ -59,7 +60,8 @@ impl SidebarState {
             marks: super::marks::load(),
             order: super::order::load(),
             drop: None,
-            held_drop: None,
+            scroll: ScrollHandle::new(),
+            drag_scroll: None,
             agent_popover_open: false,
             renaming: None,
             focus: cx.focus_handle(),

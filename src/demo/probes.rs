@@ -6,6 +6,9 @@
 //! and holds it there (no drop): the picture shows the window's accept-as-it-is wash.
 //! `BENCH_DEMO_CLICK=<x>,<y>`: the left button pressed and let go there (points), two seconds in:
 //! a picture shows who took the click and who has the focus.
+//! `BENCH_DEMO_DRAG=<x>,<y>:<x>,<y>[:hold]`: the left button pressed at the first place, carried to
+//! the second and let go there (`hold`: kept down): what a person's hand does, so a picture shows
+//! what a drag really lands on.
 
 use std::path::PathBuf;
 
@@ -42,6 +45,48 @@ pub(super) fn click(at: &str, window: &mut Window, cx: &mut Context<BenchApp>) {
             let _ = handle.update(cx, |_, window, cx| window.dispatch_event(event, cx));
             wait.timer(std::time::Duration::from_millis(60)).await;
         }
+    })
+    .detach();
+}
+
+/// `<x>,<y>` in points.
+fn place(at: &str) -> Option<Point<Pixels>> {
+    let (x, y) = at.split_once(',')?;
+    Some(point(px(x.parse().ok()?), px(y.parse().ok()?)))
+}
+
+pub(super) fn drag(spec: &str, window: &mut Window, cx: &mut Context<BenchApp>) {
+    let mut parts = spec.split(':');
+    let (Some(from), Some(to)) = (parts.next().and_then(place), parts.next().and_then(place)) else {
+        return;
+    };
+    let hold = parts.next() == Some("hold");
+    let handle = window.window_handle();
+    let wait = cx.background_executor().clone();
+    cx.spawn(async move |_, cx| {
+        wait.timer(std::time::Duration::from_secs(2)).await;
+        let modifiers = Modifiers::default();
+        let moved = |position| PlatformInput::MouseMove(MouseMoveEvent { position, pressed_button: Some(MouseButton::Left), modifiers });
+        let press = MouseDownEvent { button: MouseButton::Left, position: from, modifiers, click_count: 1, first_mouse: false };
+        let _ = handle.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseDown(press), cx));
+        const STEPS: usize = 12;
+        for step in 1..=STEPS {
+            let done = step as f32 / STEPS as f32;
+            let position = point(from.x + (to.x - from.x) * done, from.y + (to.y - from.y) * done);
+            let _ = handle.update(cx, |_, window, cx| window.dispatch_event(moved(position), cx));
+            wait.timer(std::time::Duration::from_millis(40)).await;
+        }
+        if hold {
+            // Held there: a real pointer moving over the copy would otherwise say where it is.
+            loop {
+                wait.timer(std::time::Duration::from_millis(100)).await;
+                if handle.update(cx, |_, window, cx| window.dispatch_event(moved(to), cx)).is_err() {
+                    return;
+                }
+            }
+        }
+        let release = MouseUpEvent { button: MouseButton::Left, position: to, modifiers, click_count: 1 };
+        let _ = handle.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseUp(release), cx));
     })
     .detach();
 }

@@ -90,14 +90,14 @@ hooks! {
     search = "BENCH_DEMO_SEARCH",
     /// <thread id>: that thread being renamed.
     rename = "BENCH_DEMO_RENAME",
-    /// <group>:above|below: the sidebar's drop line over a project's group.
-    drop_line = "BENCH_DEMO_DROPLINE",
     /// agent: its popover open, with long lines in its log.
     pop = "BENCH_DEMO_POP",
     /// chat, between, right, foot, side, tint: a file carried into the window there.
     drop = "BENCH_DEMO_DROP",
     /// <x>,<y>: the left button pressed and let go there.
     click = "BENCH_DEMO_CLICK",
+    /// <x>,<y>:<x>,<y>[:hold]: the left button carried from the first place to the second.
+    drag = "BENCH_DEMO_DRAG",
     /// The composer's hover tools shown at rest.
     tools_shown = "BENCH_TOOLS_SHOWN",
 }

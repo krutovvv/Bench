@@ -61,6 +61,18 @@ pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl Int
         )
 }
 
+/// What follows the pointer while something is dragged: the card it is shown in, its words the
+/// caller's.
+pub fn drag_card(cx: &App) -> Div {
+    let theme = cx.theme();
+    h_flex()
+        .items_center()
+        .rounded_md()
+        .border_1()
+        .border_color(theme.border)
+        .bg(theme.popover)
+}
+
 /// Where a row held in the air over another lands: above it or below it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DropEdge {

@@ -20,7 +20,6 @@ use gpui_kit::*;
 use bench_ui::Gap;
 
 use crate::app::BenchApp;
-use crate::sidebar::order::DraggedProject;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -48,7 +47,7 @@ impl BenchApp {
             .size_full()
             // What is made and found, over the list, as Claude's "New" and "Search".
             .child(self.render_actions(cx))
-            .child(
+            .child(self.drag_list(
                 v_flex()
                     .id("threads")
                     // After a click on a thread: ↑ ↓ open the next, ⌫ deletes (`sidebar_items.rs`).
@@ -56,17 +55,10 @@ impl BenchApp {
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                         this.sidebar_key(&ev.keystroke, window, cx)
                     }))
-                    // Out of the list, the project in the air lands nowhere: no line says so.
-                    .on_drag_move::<DraggedProject>(cx.listener(
-                        |this, ev: &DragMoveEvent<DraggedProject>, _, cx| {
-                            if !ev.bounds.contains(&ev.event.position) && this.sidebar.drop.take().is_some() {
-                                cx.notify();
-                            }
-                        },
-                    ))
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
+                    .track_scroll(&self.sidebar.scroll)
                     // Room under the last group before the foot's hairline.
                     .pt(Gap::Xs)
                     .pb(Gap::L)
@@ -84,7 +76,8 @@ impl BenchApp {
                                 .child("Connecting…"),
                         )
                     }),
-            )
+                cx,
+            ))
             .into_any_element()
     }
 

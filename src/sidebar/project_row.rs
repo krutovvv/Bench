@@ -106,16 +106,13 @@ impl BenchApp {
         let collapsed = head.collapsed;
         let g = head.g;
         let id = head.id.clone();
-        // The Host is always first: nothing lands above it, and it never goes in the air.
-        let host = g == 0;
         // The line over a group says where the project in the air will land, and it shows only
         // while GPUI says a drag is live: a target left from a drag let go elsewhere cannot keep a
         // line on screen.
         let edge = cx
             .has_active_drag()
             .then(|| self.drop_edge_over(&id))
-            .flatten()
-            .or_else(|| self.sidebar.held_drop.filter(|(at, _)| *at == g).map(|(_, edge)| edge));
+            .flatten();
         let mut parts: Vec<AnyElement> = vec![self.render_group_head(head, cx)];
         if !collapsed {
             if let Some(note) = note {
@@ -148,11 +145,7 @@ impl BenchApp {
                         .right(px(bench_ui::SIDEBAR_ROW_INSET)),
                 )
             });
-        // Every group takes the project in the air (`order.rs`); the Host, always first, only
-        // under itself.
-        if host {
-            return self.first_place_zone(zone, onto, cx).into_any_element();
-        }
+        // Every group takes the project in the air (`order.rs`).
         self.drop_zone(zone, onto, cx).into_any_element()
     }
 
