@@ -13,7 +13,7 @@ The window's layout, as Zed's workspace: three docks around the center, each sho
 panels, and the center showing one item. The window's places and what fills each — threads or
 the Explorer's tree on the left, a thread, a document or a settings page in the center, the
 thread beside on the right, the project's terminal at the bottom — are described once in
-`docs/explorer.md` (`explorer`, "The window's three places").
+`src/explorer/SPEC.md` (`explorer`, "The window's three places").
 
 ## Boundary
 

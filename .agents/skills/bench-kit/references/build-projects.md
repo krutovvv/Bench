@@ -1,6 +1,6 @@
 # Projects, agents, machines: where a project lives
 
-The second core, beside the thread. Design: `docs/remote-projects.md`. This page is how it is
+The second core, beside the thread. Design: `src/app/SPEC.md`. This page is how it is
 built and how to grow it without patches.
 
 ## Three things, kept apart

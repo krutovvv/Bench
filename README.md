@@ -14,7 +14,7 @@ And a starting point: fork it, and have your agent build what you need into it.<
 </p>
 
 <p align="center">
-  <img src="docs/shots/tour.gif" alt="A short tour: a new project, a chat with the agent, its folded steps, the review of a turn, the Code view, a diff, a server's terminal, a project's settings">
+  <img src="assets/shots/tour.gif" alt="A short tour: a new project, a chat with the agent, its folded steps, the review of a turn, the Code view, a diff, a server's terminal, a project's settings">
 </p>
 
 > **Alpha.** Everything works and I use it every day, but it is not yet as fast or as reliable
@@ -74,7 +74,7 @@ Each project has its own environment, and nothing of it leaks into another proje
 (`SYSTEM.md`), prompts, skills, MCP servers, language servers, a schedule of jobs and a Telegram
 bot.
 
-![A new project: local, a server over SSH, a server's own agent, or no folder](docs/shots/new-project.png)
+![A new project: local, a server over SSH, a server's own agent, or no folder](assets/shots/new-project.png)
 
 ## Chat and Code
 
@@ -86,8 +86,8 @@ is doing right now. Unfold the line to see every step.
 
 <table>
 <tr>
-<td><img src="docs/shots/chat.png" alt="A chat: the agent's actions folded into one line, then its answer with a chart"></td>
-<td><img src="docs/shots/actions.png" alt="The same turn with its actions unfolded: reads, edits, a dev server, web fetches"></td>
+<td><img src="assets/shots/chat.png" alt="A chat: the agent's actions folded into one line, then its answer with a chart"></td>
+<td><img src="assets/shots/actions.png" alt="The same turn with its actions unfolded: reads, edits, a dev server, web fetches"></td>
 </tr>
 </table>
 
@@ -96,7 +96,7 @@ lines changed since the last commit, and a chat beside the editor. Look at what 
 the chat, select lines and send them to it, point it at an exact place in an exact file, or just
 fix the code yourself and save.
 
-![The Code view: the project's files, an open document, the thread beside it with the selected lines attached](docs/shots/code.png)
+![The Code view: the project's files, an open document, the thread beside it with the selected lines attached](assets/shots/code.png)
 
 Because a project can live on a server, this works the same for a remote folder: open a server's
 project (even production, if you dare) and work with it, with the agent or by hand, as if it were
@@ -113,8 +113,8 @@ lets you keep many more projects going at once.
 
 <table>
 <tr>
-<td><img src="docs/shots/review.png" alt="Changed files under an answer and the reviewer's two notes"></td>
-<td><img src="docs/shots/diff.png" alt="A file's changes since HEAD in the Code view"></td>
+<td><img src="assets/shots/review.png" alt="Changed files under an answer and the reviewer's two notes"></td>
+<td><img src="assets/shots/diff.png" alt="A file's changes since HEAD in the Code view"></td>
 </tr>
 </table>
 
@@ -131,7 +131,7 @@ lets you keep many more projects going at once.
 The model itself is the gear's, one for every project, with a fallback that takes over when the
 main one fails or goes silent.
 
-![A project's settings: the evaluator, the step limit, compaction, the Telegram bot](docs/shots/settings.png)
+![A project's settings: the evaluator, the step limit, compaction, the Telegram bot](assets/shots/settings.png)
 
 ## Telegram
 
@@ -156,7 +156,7 @@ what it shows with every message and can act on it.
 | **`/browser`** | the thread's own tab in a browser on a server; you can click in it | drives the tab while you watch and step in |
 | **`/tools …`** | small utilities: Base64, JSON ↔ YAML, cron, regex… | sees the input and the output, explains, fixes |
 
-![A server's terminal in a thread: the agent found what makes the site slow](docs/shots/server.png)
+![A server's terminal in a thread: the agent found what makes the site slow](assets/shots/server.png)
 
 Messages you send while the agent works wait in a queue. A run survives a restart of the app,
 because every step is kept on disk.
@@ -184,7 +184,7 @@ checks the change on its own copy of the app with made-up data, commits it and r
 Everything that loop needs is in the repository, so it works in your fork too:
 
 - [`AGENTS.md`](AGENTS.md): what an agent reads first: how to work here and where to look;
-- [`docs/map.md`](docs/map.md): the file for each common change;
+- [`.agents/skills/bench-map`](.agents/skills/bench-map/SKILL.md): the file for each common change;
 - `SPEC.md` beside every module: why it is built the way it is, linked into one tree;
 - [`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md): the UI pieces with pictures,
   the look's rules, how to check a change with a screenshot.

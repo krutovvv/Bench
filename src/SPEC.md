@@ -3,7 +3,7 @@ id: app
 type: module-design
 status: draft
 title: src/ — the Bench app (the window and its areas)
-parent: architecture
+parent: bench
 depends-on: [ui, protocol, thread-core, devtools]
 references: [projects-and-agents]
 ---

@@ -3,14 +3,26 @@
 Bench is a native Mac app for working with an AI agent: Rust and GPUI (gpui-kit 0.8), with its own
 agent in `agent/`, a Node server on Pi Durable. The person writes in Russian: answer in Russian.
 
-Where to look:
+The basics:
 
-- Where the code for something is: `docs/map.md`. Then look at that file's whole folder.
-- What a thread, insert, card, project, agent or the Explorer is: the skill `bench-concepts`.
-- How the agent uses Pi Durable: the skill `pi-durable-dev-rules`.
-- Why a module is built as it is: the `SPEC.md` in its folder. Read it before changing the module.
-  A change that moves a decision updates the spec in the same commit.
-- UI work: the skill `bench-kit`. A new feature, module or refactor: the skill `bench-structure`.
+- A **thread** is one conversation with the agent: messages, the agent's steps, and **inserts**, live
+  tools the person puts in with `/`.
+- A **project** is the sidebar's unit. It belongs to an **agent** (this Mac's or a server's) and says
+  where its work is. **Host** is an agent's own environment.
+- The **Explorer** shows a project's files as an IDE does, beside its threads.
+
+Everything else you need is in skills. Read one with `skill_view` before you need it:
+
+- `bench-map`: which file to open for a change. Read this first for any change.
+- `bench-concepts`: the exact meaning of each word above.
+- `bench-kit`: UI and insert work, and how to look at a change.
+- `bench-structure`: where a new feature, module or file goes, and how to refactor.
+- `pi-durable-dev-rules`: anything in the agent that touches Pi Durable, and how Bench maps onto it.
+- `gpui-kit`, `rust-best-practices`: the framework and Rust, once the above have no answer.
+
+Why a module is built as it is: its `SPEC.md`, beside its code. The first time you touch a file in a
+module, a note names its spec: read it then. A change that moves a decision updates the spec in the
+same commit.
 
 ## Before you fix or add anything
 

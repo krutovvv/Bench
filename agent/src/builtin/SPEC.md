@@ -5,7 +5,7 @@ status: draft
 title: agent/src/builtin — the agent's own tools and stores
 parent: agent
 depends-on: [agent-machine]
-references: [thread-objects, projects-and-agents]
+references: [thread-view, projects-and-agents]
 ---
 
 # The agent's tools

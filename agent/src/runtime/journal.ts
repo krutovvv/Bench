@@ -162,7 +162,7 @@ export function itemsOf(entry: any, requests?: Requests): ThreadItem[] {
 					});
 				else if (b.type === "toolCall") {
 					out.push({ key: key(), seq, kind: "tool", call_id: String(b.id), name: String(b.name), args: b.arguments ?? {}, preview: preview(String(b.name), b.arguments), at });
-					// The plan is the `todo` call itself (docs/thread-objects.md): its steps, read
+					// The plan is the `todo` call itself (src/thread/SPEC.md): its steps, read
 					// from the journal, under the call's id.
 					if (b.name === "todo") out.push({ key: key(), seq, kind: "plan", id: String(b.id), todos: planOf(b.arguments) });
 					// So is a question: the `clarify` call, answered by its result.

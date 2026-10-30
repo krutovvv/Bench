@@ -48,7 +48,7 @@ Every rule that crosses the window is one pixel row. Settings pages are a centre
 | A new tool (a server, a utility) | an insert put in with `/` (`build-insert.md`) | a sidebar group, a mode, a side panel |
 | A form a tool needs (a new server, a new host) | an agent-message card under the insert that asked for it | a dialog, a settings page |
 | A project's settings (name, where, model, Telegram) | its Settings page (a tab, `DocKey::Settings`, `src/env/page.rs`) | a thread, a dialog |
-| What a project contains (files, soul, prompts, skills, MCP, schedule) | the Explorer (`src/explorer/`, `docs/explorer.md`) | a thread, a settings tab |
+| What a project contains (files, soul, prompts, skills, MCP, schedule) | the Explorer (`src/explorer/`, `src/explorer/SPEC.md`) | a thread, a settings tab |
 | The sidebar's fold | the title bar, right after the traffic lights; New project: a row over the sidebar's list | a bar under the window |
 | New window, Settings, and every other command | the menu bar (`app/menu.rs`), with its key | a button in a bar |
 | Attach, dictate, Send / Stop | the composer's field | a bar |

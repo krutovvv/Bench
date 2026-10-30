@@ -1,7 +1,7 @@
 // `resolve_comment`: the person's review comments on the project's code come in a message as
 // "Comment <id> on `path:lines`: <note>" with the lines fenced under it (Bench's ⌘⇧L,
 // src/explorer/pane/comment.rs). The agent addresses each and closes it with this call. The call is
-// the record (docs/thread-objects.md): Bench reads which comments are resolved, and how, from the
+// the record (src/thread/SPEC.md): Bench reads which comments are resolved, and how, from the
 // journal; nothing is kept beside it.
 
 import { Type } from "@earendil-works/pi-ai";

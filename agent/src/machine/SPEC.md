@@ -12,7 +12,7 @@ references: [projects-and-agents]
 Gives each conversation the `ExecutionEnv` (Pi Durable's files and shell) its tools work
 through, so Pi's read, write, edit and bash and our grep, glob and ls work unchanged wherever the
 project is. `runtime/tools-host.ts` `envFor` picks it per conversation; why a project's work can
-be on another machine than its agent is `projects-and-agents` (`docs/remote-projects.md` §5).
+be on another machine than its agent is `projects-and-agents` (`src/app/SPEC.md` §5).
 
 ## The three environments
 

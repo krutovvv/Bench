@@ -1,8 +1,8 @@
 # How Bench is put together
 
 The whole picture — what Bench is, where it will grow, and the structure that takes that growth —
-is `docs/architecture.md` in the repository. Where each thing is: `docs/map.md` (the one source for
-the source layout). Agents, machines and projects on servers: `docs/remote-projects.md` (and
+is `.agents/skills/bench-structure/references/architecture.md` in the repository. Where each thing is: the skill `bench-map` (the one source for
+the source layout). Agents, machines and projects on servers: `src/app/SPEC.md` (and
 `build-projects.md`). Each module's why: its `SPEC.md`. In short:
 
 - **Crates** (`crates/`): `ui` (every element and size), `storybook` (all of them on one page),

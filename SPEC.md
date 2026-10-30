@@ -7,8 +7,7 @@ title: Bench — a native workbench for working with an AI agent
 
 # Bench
 
-The root of Bench's spec graph. Every `SPEC.md` in this repository (and a few documents in
-`docs/` that carry spec frontmatter) is a node of it; `parent` links mirror the code tree, and
+The root of Bench's spec graph. Every `SPEC.md` in this repository is a node of it; `parent` links mirror the code tree, and
 `scripts/specs-check.mjs` keeps the links whole. A module's spec says what the code alone does
 not: what the module is for, where its boundary runs, the decisions and invariants behind it.
 Read the spec of the module you are about to change; a change that moves a boundary or

@@ -3,9 +3,9 @@ id: agent
 type: module-design
 status: draft
 title: agent/ — Bench's own agent, a Node server on Pi Durable
-parent: architecture
+parent: bench
 depends-on: [protocol]
-references: [projects-and-agents, thread-objects]
+references: [projects-and-agents, thread-view]
 ---
 
 # The agent

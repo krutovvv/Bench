@@ -6,7 +6,7 @@ The loop for every single change, with the commands: `build-change-loop.md`.
 
 Most requests ("the border is 1px off", "move the icon", "more air", "the card closes by
 itself") are about one value in one place. Before writing code:
-1. Find the place: `docs/map.md`, or `grep -rn` the visible label ("Search", "Copy") or the
+1. Find the place: the skill `bench-map`, or `grep -rn` the visible label ("Search", "Copy") or the
    helper `ui-catalog.md` names.
 2. A size or a gap is a constant in `crates/ui` (`metrics.rs`, `Gap`): change it there, so every
    place that shares it follows; never a `px(…)` in a screen.

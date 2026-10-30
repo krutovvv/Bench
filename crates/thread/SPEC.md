@@ -3,9 +3,9 @@ id: thread-core
 type: module-design
 status: draft
 title: crates/thread — a thread as rows, without GPUI
-parent: architecture
+parent: bench
 depends-on: [protocol]
-references: [thread-objects]
+references: [thread-view]
 ---
 
 # thread
@@ -55,4 +55,4 @@ keeps its scroll (`thread-view`).
 
 The crate replaced a thread assembled from three lists (turns guessed from a flat history, a
 queue apart, inserts placed by counting messages), glued together with heuristics that made rows
-jump; the history of that is `docs/thread-rewrite.md` (a plan, kept as background, not a spec).
+jump.

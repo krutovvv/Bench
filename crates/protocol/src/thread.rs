@@ -24,7 +24,7 @@ pub enum ThreadItem {
         #[serde(default)]
         sub: Option<String>,
         /// Bench's id for the message (the `request_id` it was sent with): the row shown on
-        /// Enter is this one (docs/thread-objects.md).
+        /// Enter is this one (src/thread/SPEC.md).
         #[ts(optional)]
         #[serde(default)]
         request: Option<String>,

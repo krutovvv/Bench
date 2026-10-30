@@ -1,6 +1,6 @@
 // A project's machine over SSH, as Pi's coding tools see it: an `ExecutionEnv` (Pi Durable's
 // environment: files and a shell) whose files and commands are on a server
-// (`docs/remote-projects.md`). Pi is unchanged: the agent gives a conversation of such a project
+// (`src/app/SPEC.md`). Pi is unchanged: the agent gives a conversation of such a project
 // this environment instead of `NodeExecutionEnv`, and read/write/edit/bash work there.
 //
 // One connection per server: OpenSSH with ControlMaster (`~/.bench/ssh/%C`), so every command and

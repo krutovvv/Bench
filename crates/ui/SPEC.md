@@ -3,7 +3,7 @@ id: ui
 type: module-design
 status: draft
 title: crates/ui (bench_ui) and the storybook — every element and size
-parent: architecture
+parent: bench
 ---
 
 # bench_ui

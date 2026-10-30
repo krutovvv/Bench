@@ -2,7 +2,7 @@
 //! each showing one of its panels — the left one the threads or the Explorer's tree, the right
 //! one the thread beside the code, the bottom one what runs under the center — and the center
 //! showing a thread, a document (a project's settings among them) or a settings page
-//! (`docs/explorer.md`). What fills each is the panel's or item's own module
+//! (`src/explorer/SPEC.md`). What fills each is the panel's or item's own module
 //! (`src/sidebar/mod.rs`, `src/explorer/`, `src/thread/`, `src/env/`); here is only which one is
 //! shown.
 

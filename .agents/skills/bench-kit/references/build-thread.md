@@ -1,6 +1,6 @@
 # The thread: Pi's journal as rows on a list
 
-The core of Bench. Design and history: `docs/thread-rewrite.md`. This page is how it works and
+The core of Bench. Design: `src/thread/SPEC.md`. This page is how it works and
 how to change it without breaking what it promises.
 
 ## The pipeline

@@ -19,7 +19,7 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   person's **inserts**. One conversation in Pi. It never switches mode or gets renamed because of
   an insert. Bench shows Pi's journal of it as rows (`crates/thread`), on a list that **nothing
   moves but the person** — a run that ends, a row that grows, an answer that arrives never scroll
-  it (`docs/thread-rewrite.md`).
+  it (`src/thread/SPEC.md`).
 - **Insert**: a small live tool put into a thread with `/`. The words are `/terminal`, `/browser`
   (where the project has the server browser's MCP) and each utility's own (`/base64`, `/json-yaml`…;
   `/tools …` lists them all). Every `/` adds a new insert where the conversation is. An insert:
@@ -41,7 +41,7 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   agent; Restart in the agent's popover restarts its service. The Mac's agent keeps the
   list of servers' agents. Each agent has its own models, voice and general Telegram bot.
 - **Project**: the sidebar's only unit. It belongs to one agent and says where its work is
-  (`docs/remote-projects.md`):
+  (`src/app/SPEC.md`):
   - **agent**: this Mac's or a server's;
   - **machine**: the agent's own, or — with this Mac's agent — a server it works on over SSH
     (nothing installed there);
@@ -59,7 +59,7 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
 
   What it *is set to* (name, where it lives, model, Telegram) is its **Settings** (the last row of its Explorer); what it
   *contains* (its folder, soul, prompts, skills, MCP and language servers, schedule) is the
-  **Explorer** (`docs/explorer.md`). The agent changes the same files when asked, from any
+  **Explorer** (`src/explorer/SPEC.md`). The agent changes the same files when asked, from any
   thread of the project. Nothing of one project's environment reaches another, Host's
   included: its soul, MCP servers, skills, prompts, memory and settings are its own threads'
   alone (only the model is the gear's, one for all). **Host** is an agent's own environment: this Mac's is always first in the

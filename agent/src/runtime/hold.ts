@@ -1,4 +1,4 @@
-// The person's pause of a run (docs/thread-objects.md). Pi has no pause of a conversation, so
+// The person's pause of a run (src/thread/SPEC.md). Pi has no pause of a conversation, so
 // the pause is ours, in Pi's terms: a conversation document `bench.hold` with the run's holds,
 // changed in commits, and a gate in the `beforeTool` hook that reads it. Pi runs `beforeTool`
 // before it records a call's intent, so a run that resumes after a restart meets the gate

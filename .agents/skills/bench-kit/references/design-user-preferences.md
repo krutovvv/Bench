@@ -78,7 +78,7 @@ is separate).
 - No personal data or tokens left on servers. "Nothing installed" holds only for this Mac's
   agent working on a server as a project's machine (over SSH). A server's own agent (added in
   the gear) and a project's language servers are installed there by Bench
-  (`docs/remote-projects.md`).
+  (`src/app/SPEC.md`).
 - The IDE is built in (the Explorer, Code): no external editor is referenced or needed.
 
 - **The Bench aggregates; data stays native** (servers in `~/.ssh/config`). The user rejected a JSON store, then SQLite, then a

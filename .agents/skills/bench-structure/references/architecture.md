@@ -1,22 +1,13 @@
----
-id: architecture
-type: architecture-design
-status: draft
-title: Bench's architecture — where it grows and how the structure is laid for it
-parent: bench
-references: [thread-objects, projects-and-agents]
----
-
 # Архитектура Bench: куда он будет расти и как это заложить
 
-План переписывания треда — [thread-rewrite.md](thread-rewrite.md). Этот документ отвечает на
+Этот документ отвечает на
 вопрос шире: какая структура выдержит развитие Bench без заплаток.
 
 ## 1. Что Bench на самом деле
 
 У Bench три ядра: **проекты** (где живёт работа: агент, машина, папка), **треды** (лента блоков:
 сообщения человека и агента, работа агента, вставки `/terminal`, `/browser`, утилиты…, карточки) и
-**Explorer** (проект глазами IDE: дерево, документы во вкладках, тред рядом, `docs/explorer.md`).
+**Explorer** (проект глазами IDE: дерево, документы во вкладках, тред рядом, `src/explorer/SPEC.md`).
 Окно устроено как workspace в Zed (`src/workspace/mod.rs`): левый док с панелью тредов или
 Explorer, центр, правый док. Настройки проекта — документ в Explorer, шестерёнка — страница в центре.
 
@@ -112,7 +103,7 @@ agent/src/server.ts   только собирает модули из списк
 
 - Задача «новая вставка» — скопировать `src/inserts/tools`, переименовать, реализовать `InsertKind`.
 - Вопрос «как выглядит кнопка» решает `storybook`, а не поиск в `~/.cargo/registry`.
-- Вопрос «где это» решает `docs/map.md`; «почему так» — `SPEC.md` модуля.
+- Вопрос «где это» решает the skill `bench-map`; «почему так» — `SPEC.md` модуля.
 
 ## 5. Порядок
 

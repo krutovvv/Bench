@@ -3,16 +3,15 @@ id: projects-and-agents
 type: architecture-design
 status: draft
 title: Projects — where the agent runs and where the work is done
-parent: architecture
+parent: app
 references: [client, agent-machine, env]
-covers: [src/app/places.rs, src/app/agents.rs]
 ---
 
 # Проекты: где работает агент и где делается работа
 
 Как Bench работает с проектами на этом Mac и на серверах — одной реализацией с разными
 настройками, а не отдельными путями «для удалённых». Почему всё устроено вообще так —
-[architecture.md](architecture.md).
+`.agents/skills/bench-structure/references/architecture.md`.
 
 ## 1. Три понятия
 

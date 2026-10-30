@@ -1,4 +1,4 @@
-//! The new project's page (the sidebar's last row, "New project"), `docs/remote-projects.md`:
+//! The new project's page (the sidebar's last row, "New project"), `src/app/SPEC.md`:
 //! where its work happens — this Mac, a server from this Mac, a server's own agent, or no folder
 //! — as four cards, then what that place needs, its name, and one sentence saying who will do
 //! the work where. It takes the center, as Settings does; Escape or Cancel goes back.
@@ -492,7 +492,7 @@ impl BenchApp {
     }
 }
 
-/// Where a new project's work happens (`docs/remote-projects.md`): the four answers.
+/// Where a new project's work happens (`src/app/SPEC.md`): the four answers.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Place {
     /// A folder on this Mac, this Mac's agent.

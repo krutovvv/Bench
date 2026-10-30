@@ -27,7 +27,7 @@ Which area and which procedure: `ui-areas.md` (put / move / fit).
 
 - Grep a unique visible string: a label, a tooltip, a placeholder:
   `grep -rn 'Hide sidebar  ⌘' src/`.
-- Or open the row for it in `docs/map.md`.
+- Or open the row for it in the skill `bench-map`.
 - Read the whole function before editing. The value you need often has a comment saying why
   (`// 22 + the 2px selection stripe = the 24 of the headers`).
 
@@ -169,7 +169,7 @@ was rebuilt. Build the app, then ask them to restart Bench and try it.
 ## The loop, as a checklist
 
 1. target in numbers
-2. find the code (`docs/map.md`)
+2. find the code (the skill `bench-map`)
 3. shot + numbers before
 4. one exact edit
 5. a demo hook if needed

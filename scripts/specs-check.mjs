@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// Checks Bench's spec graph (SPEC.md at the root): every `SPEC.md` in the tree and every
-// `docs/*.md` whose frontmatter carries `id` and `type` is a node. Fails on a missing field, an
+// Checks Bench's spec graph (SPEC.md at the root): every `SPEC.md` in the tree is a node. Fails on a missing field, an
 // unknown type or status, a duplicate id, a link to an id that does not exist, a parent cycle, a
 // `covers` path that does not exist, or a graph with other than one root.
 //
@@ -47,8 +46,6 @@ function frontmatter(text) {
 }
 
 const files = walk(ROOT, []);
-const docs = path.join(ROOT, "docs");
-for (const f of fs.existsSync(docs) ? fs.readdirSync(docs) : []) if (f.endsWith(".md")) files.push(path.join(docs, f));
 
 const problems = [];
 const nodes = new Map();

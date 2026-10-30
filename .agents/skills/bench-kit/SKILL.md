@@ -16,7 +16,7 @@ How to change what Bench shows. The words are in the skill `bench-concepts`, how
 
 ## Where to look, in this order
 
-1. Where the code is: `docs/map.md`.
+1. Where the code is: the skill `bench-map`.
 2. What an element looks like: `crates/storybook/reference/`. The call for each:
    `references/ui-catalog.md`.
 3. Whether it exists: `crates/ui`, and the pages below (`ui-overlays.md` for menus). Missing: add
@@ -24,7 +24,7 @@ How to change what Bench shows. The words are in the skill `bench-concepts`, how
 4. How the framework does it: one grep for the name, no reading around. gpui-kit is a facade over
    `gpui-component-0.8.0` (`~/.cargo/registry/src/index.crates.io-*/gpui-component-0.8.0/src`);
    GPUI is `vendor/gpui-base` (patched), its `text_xs`… in `gpui-pre-0.3.9/src/styled.rs`.
-5. Why it is built this way: the module's `SPEC.md`, `docs/architecture.md`.
+5. Why it is built this way: the module's `SPEC.md`, `.agents/skills/bench-structure/references/architecture.md`.
 
 A `Button` that ignores a font size or won't wrap: `ui-gotchas.md` ("A `Button` is not a row of
 text").
@@ -52,7 +52,7 @@ text").
 - **A new insert** → a folder in `src/inserts/` (`references/build-insert.md`).
 - **The window's places** → `src/workspace/dock.rs` (`Dock`, `Panel`) and `mod.rs` (`Center`), as Zed's workspace;
   **the Explorer** (a project's files and the agent's texts as an IDE shows them) →
-  `src/explorer/`, `docs/explorer.md`.
+  `src/explorer/`, `src/explorer/SPEC.md`.
 - **A project's Settings or parts** → a file in `src/env/` implementing `Section` and `SettingsForm` (a line in `FORMS`) or `ExplorerParts` (a line in `PARTS`)
   (`src/env/mod.rs`); where it lives: `place.rs`; its data from `/api/projects/<id>/env`.
 - **The sidebar** → `src/sidebar/mod.rs` draws; what is done to a thread or project (menu, a

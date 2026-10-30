@@ -5,7 +5,6 @@ status: draft
 title: The window's three places, and the Explorer
 parent: app
 references: [workspace, env, thread-view]
-covers: [src/explorer/]
 ---
 
 # The window's three places, and the Explorer

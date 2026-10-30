@@ -1,5 +1,5 @@
 //! The Explorer: a project seen as an editor sees it — a panel of the left dock (its tree), its
-//! documents in the center with tabs, the thread in the right dock (`docs/explorer.md`,
+//! documents in the center with tabs, the thread in the right dock (`src/explorer/SPEC.md`,
 //! `src/workspace/mod.rs`). The tree has the project's folder (on its
 //! machine), what its agent reads as text (the soul, prompts, skills), its tools (MCP and
 //! language servers) and its schedule.

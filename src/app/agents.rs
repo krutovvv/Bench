@@ -1,4 +1,4 @@
-//! The agents Bench works with (`docs/remote-projects.md`): this Mac's (key "") and the servers'
+//! The agents Bench works with (`src/app/SPEC.md`): this Mac's (key "") and the servers'
 //! this Mac knows (key: the ~/.ssh/config alias; their list is this Mac's agent's, `places.rs`),
 //! each installed and started over SSH and reached through a tunnel (`connection.rs`). One link
 //! per agent, all alike: its typed session (`client::rpc::Client`), its REST connection once up.

@@ -1,4 +1,4 @@
-// The servers whose agents this person works with, besides this machine's (`docs/remote-projects.md`).
+// The servers whose agents this person works with, besides this machine's (`src/app/SPEC.md`).
 // A list of its own (the setting `agents`: host — an ~/.ssh/config alias — and the name its Host
 // project shows), kept by the agent on the person's machine; Bench connects to each. It used to be
 // project rows with a `host`: `migrateServerRows` moves those here once.

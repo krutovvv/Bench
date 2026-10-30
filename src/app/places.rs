@@ -1,4 +1,4 @@
-//! Projects and where they live (`docs/remote-projects.md`): the sidebar's projects, put together
+//! Projects and where they live (`src/app/SPEC.md`): the sidebar's projects, put together
 //! from three sources — this Mac's agent's projects, the servers' agents this Mac knows (each one's
 //! Host project), and each server's own projects — and one answer to where any of them is
 //! (`location`): which agent runs its threads, which machine its files and commands are on, which

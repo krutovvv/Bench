@@ -5,7 +5,7 @@ status: draft
 title: agent/src/runtime — the threads' core
 parent: agent
 depends-on: [agent-machine]
-references: [thread-objects, thread-core]
+references: [thread-view, thread-core]
 ---
 
 # The runtime

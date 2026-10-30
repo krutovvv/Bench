@@ -5,7 +5,7 @@ status: draft
 title: src/inserts — live tools put into a thread with "/"
 parent: app
 depends-on: [devtools, ui]
-references: [thread-objects, agent-runtime, agent-tools]
+references: [thread-view, agent-runtime, agent-tools]
 ---
 
 # Inserts

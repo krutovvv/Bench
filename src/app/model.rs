@@ -21,7 +21,7 @@ impl Target {
 /// A REST call about them names no settings at all (`client::rest::url`).
 pub const GENERAL_AGENT: &str = "default";
 
-/// A project as Bench addresses it (`docs/remote-projects.md`): the agent that keeps it — "" for
+/// A project as Bench addresses it (`src/app/SPEC.md`): the agent that keeps it — "" for
 /// this Mac's, else a server's ~/.ssh/config alias — and its id there; `HOST` is an agent's own
 /// environment (the machine's Host project). Written as one string where a plain key is needed
 /// (sessions, marks, folds): the id for this Mac's, `<agent>:<id>` for a server's.

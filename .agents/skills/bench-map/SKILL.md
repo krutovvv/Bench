@@ -1,6 +1,11 @@
+---
+name: bench-map
+description: "Use first for any change in Bench: which file to open for it, and the whole source tree."
+---
+
 # Where is what
 
-One page to open before reading code. Find the row, open that file, and look at its folder too.
+Find the row for your change, open that file, and look at its folder too.
 
 ## The common changes
 
@@ -25,7 +30,7 @@ One page to open before reading code. Find the row, open that file, and look at 
 | add an insert | `.agents/skills/bench-kit/references/build-insert.md` |
 | change a project's Settings (name, where, model, Telegram) or its parts (MCP, language servers, schedule) | `src/env/<section>.rs` (`mcp/`, `schedule.rs`, `telegram.rs`…); the page `src/env/page.rs`; a new section: `src/env/mod.rs` header |
 | export a project's environment to a file or import one (backups, a move to another project) | `src/env/backup.rs` (the Settings rows, the save and open dialogs, the alert); the agent packs and unpacks it in `agent/src/modules/backup.ts` (test `agent/test/backup.test.ts`) |
-| change the Explorer (the tree and its menus, documents, tabs, ⌘P, ⌘⇧F) | `src/explorer/`: `mod.rs` its state; `tree/` the tree (`view.rs` drawn, `parts.rs` the project's parts, `menus.rs` its context menus, `ops.rs` listing, new/rename/delete); `pane/` the middle as Zed's pane (`doc.rs` the tabs' keys and open/close/save, `item.rs` a document as Zed's `Item` — a new kind of document is a `DocKey` variant and its `Item` —, `file.rs` a file in an editor, `tabs.rs`, `view.rs`, `persistence.rs` kept between starts); `search/` (`file_finder.rs` ⌘P, `project_search.rs` ⌘⇧F); `code/` (`lsp.rs` problems, hover and definition, `problems.rs` the Problems tab ⌘⇧M, `git.rs` changed lines and a file's diff, `lang.rs` a file's language); its pieces `crates/ui/src/ide.rs`; the agent's `/api/fs/*` in `agent/src/modules/files.ts`; why: `docs/explorer.md` |
+| change the Explorer (the tree and its menus, documents, tabs, ⌘P, ⌘⇧F) | `src/explorer/`: `mod.rs` its state; `tree/` the tree (`view.rs` drawn, `parts.rs` the project's parts, `menus.rs` its context menus, `ops.rs` listing, new/rename/delete); `pane/` the middle as Zed's pane (`doc.rs` the tabs' keys and open/close/save, `item.rs` a document as Zed's `Item` — a new kind of document is a `DocKey` variant and its `Item` —, `file.rs` a file in an editor, `tabs.rs`, `view.rs`, `persistence.rs` kept between starts); `search/` (`file_finder.rs` ⌘P, `project_search.rs` ⌘⇧F); `code/` (`lsp.rs` problems, hover and definition, `problems.rs` the Problems tab ⌘⇧M, `git.rs` changed lines and a file's diff, `lang.rs` a file's language); its pieces `crates/ui/src/ide.rs`; the agent's `/api/fs/*` in `agent/src/modules/files.ts`; why: `src/explorer/SPEC.md` |
 | change what the window's docks or center show, add a panel to a dock | `src/workspace/dock.rs` (`Dock`, `Panel`), `src/workspace/mod.rs` (`Center`, `render_panel`), the layout in `src/workspace/layout.rs` |
 | change the bar over the center (a thread's title, the documents' project, a settings page's title) | `src/titlebar/mod.rs`; the documents' tab bar `src/explorer/pane/view.rs` (`render_doc`), the tabs themselves `src/explorer/pane/tabs.rs` |
 | back and forward over the threads and documents shown (‹ › in the title bar, ⌘[ ⌘]) | `src/workspace/history.rs` (`NavHistory`, noted by `BenchApp::follow_shown`, `src/app/subscriptions.rs`); the buttons `src/titlebar/mod.rs` |
@@ -119,7 +124,7 @@ src/
                  one file per section (name, place, run, telegram, instructions, lsp, schedule, mcp/, backup)
   explorer/      the Explorer: tree/, pane/ (doc.rs DocKey, item.rs Item, file.rs, tabs.rs, comment.rs,
                  persistence.rs), search/ (⌘P, ⌘⇧F), code/ (lsp, problems, git and turn_diff, lang),
-                 specs/, statusbar.rs (docs/explorer.md)
+                 specs/, statusbar.rs (SPEC.md)
   media/         what an answer carries besides text and how it shows: view.rs, text.rs, playback.rs,
                  chip.rs, fetch.rs, diagram.rs, latex.rs; attachments and sound: attach.rs, audio.rs,
                  video.rs, voice.rs, pauses.rs
@@ -143,8 +148,8 @@ agent/src/
   machine/       where tools work: ssh.ts, confined.ts, settings.ts, sh.ts
   mcp/, lsp/     MCP servers (mcp.ts, oauth.ts); language servers (lsp.ts, presets.ts)
   telegram.ts, config.ts, store.ts, specs.ts, host.ts, http.ts, instance.ts, repo.ts, audio.ts
-docs/            architecture.md (why), map.md (where), explorer.md, remote-projects.md, thread-objects.md,
-                 thread-rewrite.md (the thread's design, as a plan kept for background)
+.agents/skills/  what the agent reads: bench-map (this), bench-concepts, bench-kit, bench-structure, pi-durable-dev-rules, gpui-kit
+assets/shots/    the README's pictures
 .agents/skills/  bench-kit (how to change Bench), bench-structure (how to grow it), pi-durable-dev-rules,
                  gpui-kit and its guides, rust-best-practices
 scripts/         bundle-macos.sh, build-web.sh, gen_themes.py, specs-check.mjs

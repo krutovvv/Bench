@@ -1,4 +1,4 @@
-// Background processes (docs/thread-objects.md): a command the agent leaves running — a dev
+// Background processes (src/thread/SPEC.md): a command the agent leaves running — a dev
 // server, a watcher, a long build — while the run goes on or ends. Pi's `exec` waits for its
 // command, so a process is ours in Pi's terms: a background task of the conversation
 // (`bench.process`) whose one phase runs the command in the conversation's environment, keeps the

@@ -144,7 +144,7 @@ impl Step {
 
 /// Every row stands on a journal item; the plan and the questions are the agent's own calls
 /// (`todo`, `clarify`) inside the work that made them, and so are the background processes,
-/// at the `process` call that started each (docs/thread-objects.md).
+/// at the `process` call that started each (src/thread/SPEC.md).
 pub(crate) fn rows_of(
     log: &[ThreadItem],
     inserts: &Inserts,

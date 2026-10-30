@@ -3,7 +3,7 @@ id: devtools
 type: module-design
 status: draft
 title: crates/devtools — the /tools utilities as pure functions
-parent: architecture
+parent: bench
 ---
 
 # devtools

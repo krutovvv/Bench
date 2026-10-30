@@ -1,4 +1,4 @@
-//! Adding and removing a server's agent, in the gear (`docs/remote-projects.md`). The servers'
+//! Adding and removing a server's agent, in the gear (`src/app/SPEC.md`). The servers'
 //! agents this Mac knows are a list this Mac's agent keeps (`/api/agents`, `places.rs`); adding
 //! one picks a host from ~/.ssh/config (or writes a new one there), and Bench installs and starts
 //! the agent there on connecting. Removing it only forgets it here: the agent on the server runs

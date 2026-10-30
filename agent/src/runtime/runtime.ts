@@ -344,7 +344,7 @@ export class Runtime {
 			// A message queued that corrects the work under way joins it now (`judge/correction.ts`).
 			if (mode === "queue" && (await correctsTheWork(String(live.conversation.id), text).catch(() => false))) mode = "steer";
 			// Queued: Pi keeps it in the inbox until the run answers. Steered: placed after the
-			// current tool round. `request` is Bench's id for the message (docs/thread-objects.md):
+			// current tool round. `request` is Bench's id for the message (src/thread/SPEC.md):
 			// Pi keeps it with the submission, so its row in the queue and its entry are known as
 			// the one pressed.
 			await live.conversation.submit({ type: "input", content, whenBusy: mode === "queue" ? "followUp" : "steer", requestId: request }, ctx);

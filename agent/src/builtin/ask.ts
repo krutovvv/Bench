@@ -19,7 +19,7 @@ export const clarify = defineTool({
 	}),
 	// Asking again after a restart is harmless: the question is still the person's to answer.
 	replay: "safe",
-	// The call is the question and its result the answer (docs/thread-objects.md): the card in
+	// The call is the question and its result the answer (src/thread/SPEC.md): the card in
 	// Bench reads both from the journal. The id the person answers to is the call's.
 	execute: async (args, api, context) => {
 		const s = threadOf(api.conversationId);
@@ -47,7 +47,7 @@ export const todo = defineTool({
 		),
 	}),
 	// The plan is this call itself: its arguments in the journal are what Bench shows, where the
-	// first call of the work stands (docs/thread-objects.md). Nothing is kept beside it.
+	// first call of the work stands (src/thread/SPEC.md). Nothing is kept beside it.
 	replay: "safe",
 	execute: async (args) => {
 		const done = args.todos.filter((t) => t.status === "completed").length;

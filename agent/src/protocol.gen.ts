@@ -7,7 +7,7 @@ export type ThreadItem = { "kind": "user", key: string, seq: number, text: strin
 sub?: string, 
 /**
  * Bench's id for the message (the `request_id` it was sent with): the row shown on
- * Enter is this one (docs/thread-objects.md).
+ * Enter is this one (src/thread/SPEC.md).
  */
 request?: string, } | { "kind": "thought", key: string, seq: number, text: string, at?: number, } | { "kind": "text", key: string, seq: number, text: string, 
 /**

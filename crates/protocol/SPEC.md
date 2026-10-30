@@ -3,7 +3,7 @@ id: protocol
 type: module-design
 status: draft
 title: crates/protocol — the wire between Bench and its agent
-parent: architecture
+parent: bench
 ---
 
 # protocol

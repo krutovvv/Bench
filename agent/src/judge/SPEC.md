@@ -4,7 +4,7 @@ type: submodule-design
 status: draft
 title: agent/src/judge — the evaluator, and the step limit beside it
 parent: agent
-references: [thread-objects]
+references: [thread-view]
 ---
 
 # The evaluator
