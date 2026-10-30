@@ -170,7 +170,8 @@ impl BenchApp {
 
     /// Files carried in from the machine go to the thread the person is working in — the one
     /// whose composer has the focus, else the open one — and wait there with the next message
-    /// (`thread/composer/attachments.rs`).
+    /// (`thread/composer/attachments.rs`). That thread comes on screen if it is not: a file never
+    /// waits where it cannot be seen. A folder is not a file to attach, and it is said.
     pub fn drop_paths(
         &mut self,
         paths: Vec<std::path::PathBuf>,
@@ -188,7 +189,17 @@ impl BenchApp {
                     .is_focused(window)
             });
         let view = focused.unwrap_or_else(|| self.active_thread.clone());
+        if !paths.iter().any(|p| p.is_file()) {
+            self.toast(NotificationType::Info, "Only files attach, not folders", window, cx);
+            return;
+        }
+        match self.center {
+            Center::Chat => {}
+            Center::Doc => self.right_dock.activate(Panel::Thread),
+            Center::Settings | Center::NewProject => self.center = Center::Chat,
+        }
         view.update(cx, |v, cx| v.add_attachments(paths, cx));
+        cx.notify();
     }
 
     pub fn toast(

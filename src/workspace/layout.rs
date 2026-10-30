@@ -67,8 +67,7 @@ impl Render for BenchApp {
         };
 
         // The window's one top bar, edge to edge over the docks: room for the window's buttons,
-        // the sidebar's fold, a short rule, then the center's header (`titlebar/`). Its two parts
-        // carry the file's wash themselves, being the coloured ones.
+        // the sidebar's fold, a short rule, then the center's header (`titlebar/`).
         let header = h_flex()
             .flex_none()
             .w_full()
