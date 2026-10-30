@@ -101,6 +101,7 @@ impl Render for BenchApp {
         if self.demo {
             self.demo_hooks(window, cx);
             self.drop_probe(window, cx);
+            self.click_probe(window, cx);
         }
         // The server browser's stream follows what is on screen (no frames for a hidden thread).
         #[cfg(not(target_family = "wasm"))]

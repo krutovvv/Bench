@@ -210,7 +210,6 @@ impl ExplorerParts for Mcp {
             head_act("env-mcp-check".into(), "Check", cx)
                 .when(checking, |d| d.opacity(0.5))
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
                     cx.stop_propagation();
                     this.env_check_mcp(id.clone(), window, cx)
                 }))
@@ -283,7 +282,6 @@ impl ExplorerParts for Mcp {
                     bench_ui::chip(SharedString::from(format!("env-mcp-preset-{n}")), cx)
                         .child(title.clone())
                         .on_click(cx.listener(move |this, _, window, cx| {
-                            this.click_claimed = true;
                             cx.stop_propagation();
                             this.env_fill_mcp(&id, n.clone(), &spec, window, cx)
                         }))
@@ -309,7 +307,7 @@ impl ExplorerParts for Mcp {
                     cx.theme().primary,
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
+                    cx.stop_propagation();
                     this.env_authorize(id.clone(), n.clone(), window, cx)
                 }))
                 .into_any_element(),

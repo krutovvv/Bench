@@ -72,7 +72,7 @@ impl ThreadView {
                     .on_click(cx.listener(move |this, _, _, cx| match &single {
                         Some(url) => cx.open_url(url),
                         None => {
-                            this.claim_click(cx);
+                            cx.stop_propagation();
                             this.thread.open_source = match &this.thread.open_source {
                                 Some((t, x)) if *t == key && *x == h => None,
                                 _ => Some((key.clone(), h.clone())),

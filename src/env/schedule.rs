@@ -175,7 +175,6 @@ impl ExplorerParts for Schedule {
         Some(
             head_act("env-cron-add".into(), "+ New job", cx)
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
                     cx.stop_propagation();
                     this.open_part(id.clone(), "cron", "new".into(), window, cx)
                 }))
@@ -243,7 +242,7 @@ impl ExplorerParts for Schedule {
             actions.push(
                 card_act("env-card-run".into(), "Run now".into(), muted)
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
+                        cx.stop_propagation();
                         this.env_cron(&p1, run.clone(), "trigger", window, cx)
                     }))
                     .into_any_element(),
@@ -259,7 +258,7 @@ impl ExplorerParts for Schedule {
                     muted,
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
+                    cx.stop_propagation();
                     this.env_cron(
                         &p2,
                         pause.clone(),

@@ -152,22 +152,28 @@ impl ThreadView {
                 v_flex()
                     .id("chat")
                     .size_full()
-                    // A click anywhere in the thread means "I'm about to type": the composer takes
-                    // the focus, unless the click went into something that types itself, or the
-                    // mouse moved (a drag selects text). The click is the window's: whatever it
-                    // landed in — an insert's terminal, a field — claims it on the app.
-                    .capture_any_mouse_down(self.app_listener(|app, ev: &MouseDownEvent, _, _| {
-                        app.click_claimed = false;
-                        app.click_at = Some(ev.position);
+                    // A click on the thread itself means "I'm about to type": the composer takes
+                    // the focus. What handles a press or a click (a fold, a button, an insert's
+                    // terminal) stops its propagation, so it never gets here; a mouse that moved
+                    // (a drag selects text) or a focus that moved leaves things as they are.
+                    .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, _| {
+                        this.press = None;
                     }))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, ev: &MouseDownEvent, window, cx| {
+                            this.press = Some((ev.position, window.focused(cx)));
+                        }),
+                    )
                     .on_mouse_up(
                         MouseButton::Left,
-                        self.app_listener(move |app, ev: &MouseUpEvent, window, cx| {
-                            let still = app.click_at.take().is_some_and(|p| {
-                                (p.x - ev.position.x).abs() < px(CLICK_SLOP)
-                                    && (p.y - ev.position.y).abs() < px(CLICK_SLOP)
-                            });
-                            if still && !app.click_claimed {
+                        cx.listener(move |this, ev: &MouseUpEvent, window, cx| {
+                            let Some((at, focused)) = this.press.take() else {
+                                return;
+                            };
+                            let still = (at.x - ev.position.x).abs() < px(CLICK_SLOP)
+                                && (at.y - ev.position.y).abs() < px(CLICK_SLOP);
+                            if still && focused == window.focused(cx) {
                                 composer.update(cx, |s, cx| s.focus(window, cx));
                             }
                         }),
@@ -294,14 +300,6 @@ impl ThreadView {
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
         self.thread.tv.to_end();
         cx.notify();
-    }
-
-    /// A click inside the thread that is the thread's own (a fold, a button): it keeps the
-    /// focus where it is.
-    pub(crate) fn claim_click(&self, cx: &mut App) {
-        if let Some(app) = self.app.upgrade() {
-            app.update(cx, |app, _| app.click_claimed = true);
-        }
     }
 
     /// What the live rows had becomes their entries': the answer being written passes its parsed

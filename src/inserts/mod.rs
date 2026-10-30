@@ -323,7 +323,7 @@ impl ThreadView {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
-                    this.claim_click(cx);
+                    cx.stop_propagation();
                     this.follow = false;
                 }),
             )
@@ -373,7 +373,7 @@ impl ThreadView {
                     .hover(|s| s.text_color(theme.foreground))
                     .child("Shown in another insert of this thread — click to show it here")
                     .on_click(self.app_listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
+                        cx.stop_propagation();
                         this.inserts.live.insert(name.to_string(), claim_id.clone());
                         this.insert_opened(&at, &claim_id, window, cx);
                     }))
@@ -400,7 +400,7 @@ impl ThreadView {
                 .xsmall(),
             )
             .on_click(self.app_listener(move |this, _, _, cx| {
-                this.click_claimed = true;
+                cx.stop_propagation();
                 let patch = protocol::InsertPatch {
                     folded: Some(!folded),
                     ..Default::default()
@@ -457,7 +457,7 @@ impl ThreadView {
                     cx,
                 )
                 .on_click(self.app_listener(move |this, _, _, cx| {
-                    this.click_claimed = true;
+                    cx.stop_propagation();
                     this.remove_insert(&rm_at, &rm_id, cx);
                 })),
             );
@@ -479,7 +479,7 @@ impl ThreadView {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
-                    this.claim_click(cx);
+                    cx.stop_propagation();
                     this.follow = false;
                 }),
             )

@@ -321,7 +321,6 @@ fn new_lsp_card(app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> C
                         }),
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
                     cx.stop_propagation();
                     this.env_add_lsp(id.clone(), key.clone(), spec.clone(), window, cx)
                 }))

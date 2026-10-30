@@ -16,6 +16,44 @@ use crate::app::BenchApp;
 const PROBE_FILE: &str = "/tmp/bench-drop-probe.txt";
 
 impl BenchApp {
+    /// `BENCH_DEMO_CLICK=<x>,<y>`: the left button pressed and let go there (points), two seconds
+    /// in, as macOS sends it: a picture shows who took the click and who has the focus.
+    pub(crate) fn click_probe(&self, window: &mut Window, cx: &mut Context<Self>) {
+        static DONE: std::sync::Once = std::sync::Once::new();
+        let Some((x, y)) = std::env::var("BENCH_DEMO_CLICK").ok().and_then(|v| {
+            let (x, y) = v.split_once(',')?;
+            Some((x.parse::<f32>().ok()?, y.parse::<f32>().ok()?))
+        }) else {
+            return;
+        };
+        DONE.call_once(|| {
+            let handle = window.window_handle();
+            let wait = cx.background_executor().clone();
+            cx.spawn(async move |_, cx| {
+                wait.timer(std::time::Duration::from_secs(2)).await;
+                let position = point(px(x), px(y));
+                let press = MouseDownEvent {
+                    button: MouseButton::Left,
+                    position,
+                    modifiers: Modifiers::default(),
+                    click_count: 1,
+                    first_mouse: false,
+                };
+                let release = MouseUpEvent {
+                    button: MouseButton::Left,
+                    position,
+                    modifiers: Modifiers::default(),
+                    click_count: 1,
+                };
+                for event in [PlatformInput::MouseDown(press), PlatformInput::MouseUp(release)] {
+                    let _ = handle.update(cx, |_, window, cx| window.dispatch_event(event, cx));
+                    wait.timer(std::time::Duration::from_millis(60)).await;
+                }
+            })
+            .detach();
+        });
+    }
+
     /// The simulated drop, once, about a second after the window stood up.
     pub(crate) fn drop_probe(&self, window: &mut Window, cx: &mut Context<Self>) {
         static DONE: std::sync::Once = std::sync::Once::new();

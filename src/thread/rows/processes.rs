@@ -232,7 +232,7 @@ impl ThreadView {
             let work = work.to_string();
             cx.listener(move |this, _, _, cx| {
                 // Folding is the thread's own click: it must not pull the focus to the composer.
-                this.claim_click(cx);
+                cx.stop_propagation();
                 if !this.thread.processes_open.remove(&work) {
                     this.thread.processes_open.insert(work.clone());
                 }

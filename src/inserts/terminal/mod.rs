@@ -104,7 +104,7 @@ impl InsertKind for Terminal {
                     .child(bench_ui::dot(theme.primary))
                     .child("Background")
                     .on_click(cx.listener(move |this, _, _, cx| {
-                        this.click_claimed = true;
+                        cx.stop_propagation();
                         if let Some(t) = this.inserts.terminal.tabs.iter_mut().find(|t| t.id == id) {
                             t.background = false;
                         }
@@ -121,7 +121,7 @@ impl InsertKind for Terminal {
                 cx,
             )
             .on_click(cx.listener(move |this, _, _, cx| {
-                this.click_claimed = true;
+                cx.stop_propagation();
                 if let Some(t) = this.inserts.terminal.tabs.iter_mut().find(|t| t.id == id) {
                     t.background = true;
                 }

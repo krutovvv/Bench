@@ -120,7 +120,7 @@ impl ThreadView {
                 let id = id.to_string();
                 move |this, _, _, cx| {
                     // Folding is the thread's own click: it must not pull the focus to the composer.
-                    this.claim_click(cx);
+                    cx.stop_propagation();
                     toggle(&mut this.thread.plan_open, &id);
                     cx.notify();
                 }
@@ -182,7 +182,7 @@ impl ThreadView {
                     bench_ui::head_icon_button("clarify-decline", Ico::X, "Decline", cx)
                         .flex_none()
                         .on_click(cx.listener(|this, _, window, cx| {
-                            this.claim_click(cx);
+                            cx.stop_propagation();
                             this.answer_clarify(String::new(), window, cx)
                         })),
                 )
@@ -318,9 +318,7 @@ impl ThreadView {
                                     // button is released.
                                     .on_mouse_down(
                                         MouseButton::Left,
-                                        cx.listener(|this, _: &MouseDownEvent, _, cx| {
-                                            this.claim_click(cx)
-                                        }),
+                                        |_: &MouseDownEvent, _, cx| cx.stop_propagation(),
                                     )
                                     // `medium` as high as a choice row: the answer's own line should
                                     // not read as the shabby cousin of the offered ones.

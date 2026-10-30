@@ -133,7 +133,7 @@ pub fn fold_head(
 ) -> Stateful<Div> {
     let theme = cx.theme();
     let fg = theme.foreground;
-    block_head(theme, open)
+    crate::button::own_press(block_head(theme, open))
         .id(id)
         .gap_1p5()
         .cursor_pointer()
@@ -161,7 +161,7 @@ pub fn fold_words(open: bool, shut: impl Into<SharedString>) -> SharedString {
 pub fn fold_more(id: impl Into<ElementId>, words: impl Into<SharedString>, cx: &App) -> Stateful<Div> {
     let theme = cx.theme();
     let fg = theme.foreground;
-    div()
+    crate::button::own_press(div())
         .id(id)
         .text_color(theme.muted_foreground)
         .cursor_pointer()

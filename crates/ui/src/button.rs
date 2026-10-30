@@ -44,7 +44,7 @@ pub fn icon_button(
     cx: &App,
 ) -> Stateful<Div> {
     let theme = cx.theme().clone();
-    div()
+    own_press(div())
         .id(id)
         .flex_none()
         .p_1()
@@ -110,7 +110,7 @@ pub fn round_icon_button(
 /// actions): no ground until hovered.
 pub fn head_icon_button(id: &str, icon: Ico, tip: &'static str, cx: &App) -> Stateful<Div> {
     let theme = cx.theme().clone();
-    div()
+    own_press(div())
         .id(SharedString::from(id.to_string()))
         .p_0p5()
         .cursor_pointer()
@@ -136,7 +136,7 @@ pub fn form_action(
         theme.muted_foreground,
         theme.foreground,
     );
-    div()
+    own_press(div())
         .id(id)
         .h(px(FIELD_H))
         .flex()
@@ -157,12 +157,18 @@ pub fn form_action(
         .child(label.into())
 }
 
+/// A press on this element is its own: what is under it (a row, the thread, which would give the
+/// composer the focus) does not see it. Every clickable element here says so.
+pub fn own_press<E: InteractiveElement>(element: E) -> E {
+    element.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+}
+
 /// A small bordered chip that does something when clicked (a preset to add, a page's host, a
 /// pane strip's text button). Its size of text is the caller's.
 pub fn chip(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
     let theme = cx.theme();
     let (hover, ink) = (theme.list_hover, theme.foreground);
-    h_flex()
+    own_press(h_flex())
         .id(id)
         .gap_1()
         .px_2()

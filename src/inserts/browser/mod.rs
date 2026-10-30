@@ -163,7 +163,7 @@ impl InsertKind for Browser {
                             .on_click({
                                 let at = at.clone();
                                 cx.listener(move |this, _, _, cx| {
-                                    this.click_claimed = true;
+                                    cx.stop_propagation();
                                     this.reopen_thread_tab(&at, cx);
                                 })
                             }),
@@ -212,7 +212,7 @@ impl InsertKind for Browser {
                         .on_click({
                             let at = at.clone();
                             cx.listener(move |this, _, _, cx| {
-                                this.click_claimed = true;
+                                cx.stop_propagation();
                                 this.reopen_thread_tab(&at, cx);
                             })
                         }),

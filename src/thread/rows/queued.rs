@@ -61,7 +61,7 @@ impl ThreadView {
                         cx,
                     )
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.claim_click(cx);
+                        cx.stop_propagation();
                         this.queue_edit_save(window, cx);
                     })),
                 )
@@ -76,7 +76,7 @@ impl ThreadView {
                         cx,
                     )
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        this.claim_click(cx);
+                        cx.stop_propagation();
                         this.queue_edit_open(edit_id.clone(), edit_text.clone(), window, cx);
                     })),
                 )
@@ -90,7 +90,7 @@ impl ThreadView {
                             cx,
                         )
                         .on_click(cx.listener(move |this, _, _, cx| {
-                            this.claim_click(cx);
+                            cx.stop_propagation();
                             this.queued(send_id.clone(), true, cx);
                         })),
                     )
@@ -100,7 +100,7 @@ impl ThreadView {
                 d.child(
                     bench_ui::icon_button((id.clone(), 3), Ico::X, "Take it back", false, cx)
                         .on_click(cx.listener(move |this, _, window, cx| {
-                            this.claim_click(cx);
+                            cx.stop_propagation();
                             if this.queue_edit.as_ref().is_some_and(|(e, _)| e == &rm_id) {
                                 this.queue_edit_cancel(window, cx);
                             } else {
@@ -117,7 +117,7 @@ impl ThreadView {
                 .cursor_text()
                 .on_mouse_down(
                     MouseButton::Left,
-                    cx.listener(|this, _: &MouseDownEvent, _, cx| this.claim_click(cx)),
+                    |_: &MouseDownEvent, _, cx| cx.stop_propagation(),
                 )
                 .child(
                     Textarea::new(&st)
@@ -190,7 +190,7 @@ impl ThreadView {
         self.queue_edit = Some((id, field.clone()));
         // The click that opened this field is its own: the thread's bare-click rule (the composer
         // takes the focus) must not undo the focus this field just took.
-        self.claim_click(cx);
+        cx.stop_propagation();
         field.update(cx, |s, cx| s.focus(window, cx));
         cx.notify();
     }

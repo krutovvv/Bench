@@ -69,12 +69,6 @@ pub struct BenchApp {
     pub envs: HashMap<String, ProjectEnv>,
     /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
     pub agents: HashMap<String, agents::AgentLink>,
-    /// A click in a thread landed in something that types (a terminal, an editor) or acts (a
-    /// fold, a button): it keeps the focus. The window's pointer, so the app's.
-    pub click_claimed: bool,
-    /// Where the left button went down in the thread (a drag selects text: no focus move).
-    pub click_at: Option<Point<Pixels>>,
-
     /// What waits for a second press (a delete, closing an unsaved tab): `armed.rs`.
     pub armed: armed::Armed,
 
@@ -145,8 +139,6 @@ impl BenchApp {
             window: window.window_handle(),
             envs: HashMap::new(),
             agents: HashMap::new(),
-            click_claimed: false,
-            click_at: None,
             armed: Default::default(),
             appearance: crate::settings::appearance::load(),
             center: Center::Chat,

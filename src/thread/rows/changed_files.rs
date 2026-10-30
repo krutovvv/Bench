@@ -218,7 +218,7 @@ impl ThreadView {
                             .when(f.new, |d| d.child(div().text_color(faint).child("new"))),
                     )
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        this.claim_click(cx);
+                        cx.stop_propagation();
                         this.toggle_diff(toggle.clone(), &f_c, turn_c.clone(), window, cx)
                     }))
                     .into_any_element(),
@@ -319,7 +319,7 @@ impl ThreadView {
                 d.cursor_pointer()
                     .hover(|s| s.text_color(theme.foreground))
                     .on_click(cx.listener(move |this, _, _, cx| {
-                        this.claim_click(cx);
+                        cx.stop_propagation();
                         if start {
                             this.start_review(&k, cx);
                         } else if !this.thread.review_open.remove(&k) {

@@ -294,7 +294,7 @@ pub fn segmented(
     let theme = cx.theme().clone();
     segment_track(&theme).children(labels.into_iter().enumerate().map(|(k, label)| {
         let pick = on_pick.clone();
-        segment(div().id((id, k)), k == chosen, &theme)
+        segment(crate::button::own_press(div()).id((id, k)), k == chosen, &theme)
             .child(label.into())
             .on_click(move |_, window, cx| pick(k, window, cx))
     }))
@@ -318,7 +318,7 @@ pub fn segmented_cells(
         .border_color(theme.border)
         .children(labels.into_iter().enumerate().map(|(k, label)| {
             let pick = on_pick.clone();
-            div()
+            crate::button::own_press(div())
                 .id((id, k))
                 .px_2()
                 .py_0p5()

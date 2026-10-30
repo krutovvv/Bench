@@ -38,7 +38,7 @@ impl BenchApp {
                 .on_click({
                     let at = at.clone();
                     cx.listener(move |this, _, _, cx| {
-                        this.click_claimed = true;
+                        cx.stop_propagation();
                         this.touch_browser(&at);
                         cx.notify();
                     })
@@ -130,7 +130,7 @@ impl BenchApp {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
-                            this.click_claimed = true;
+                            cx.stop_propagation();
                             let was_paused =
                                 this.inserts.browser.conn.as_ref().is_some_and(|b| b.is_paused());
                             this.touch_browser(&at);

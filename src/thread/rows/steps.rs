@@ -132,7 +132,7 @@ impl ThreadView {
             .on_click(cx.listener({
                 let key = key.to_string();
                 move |this, _, _, cx| {
-                    this.claim_click(cx);
+                    cx.stop_propagation();
                     // Opening one folds the one open; a click on the open one folds it.
                     let to = if open { usize::MAX } else { first };
                     this.thread.open_milestone.insert(key.clone(), to);
@@ -240,7 +240,7 @@ impl ThreadView {
                 d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
             })
             .on_click(cx.listener(move |this, _, _, cx| {
-                this.claim_click(cx);
+                cx.stop_propagation();
                 // One step open at a time in a work, as one milestone is: opening one closes
                 // the one open; a click on the open one closes it.
                 if !this.thread.open_steps.remove(&toggle) {
@@ -328,7 +328,7 @@ impl ThreadView {
                         )
                             .text_size(px(bench_ui::THREAD_DETAIL))
                             .on_click(cx.listener(move |this, _, _, cx| {
-                                this.claim_click(cx);
+                                cx.stop_propagation();
                                 if !this.thread.open_fields.remove(&id) {
                                     this.thread.open_fields.insert(id.clone());
                                 }
@@ -365,7 +365,7 @@ impl ThreadView {
                                 )
                                     .text_size(px(bench_ui::THREAD_DETAIL))
                                     .on_click(cx.listener(move |this, _, _, cx| {
-                                        this.claim_click(cx);
+                                        cx.stop_propagation();
                                         if !this.thread.step_whole.remove(&toggle) {
                                             this.thread.step_whole.insert(toggle.clone());
                                         }
