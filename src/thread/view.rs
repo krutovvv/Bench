@@ -28,9 +28,9 @@ pub struct ThreadView {
     pub composer: Entity<TextareaState>,
     /// The question card's own answer.
     pub clarify_input: Entity<InputState>,
-    /// Pieces of live work the person folded, by thread: coming back to the thread they stay
-    /// folded, the run does not open them again (`carry_over`).
-    pub(crate) work_shut: std::collections::HashMap<String, std::collections::HashSet<String>>,
+    /// What the person left open or shut on the live work, by thread: its rows change keys as
+    /// the run goes on; coming back to the thread finds the work as left (`carry_over`).
+    pub(crate) work_left: std::collections::HashMap<String, std::collections::HashSet<String>>,
     /// Files waiting in the composer to go with the next message.
     pub attachments: Vec<PathBuf>,
     /// The waiting message whose words the person is fixing, and the field they fix them in.
@@ -118,7 +118,7 @@ impl ThreadView {
             thread: ActiveThread::default(),
             composer,
             clarify_input,
-            work_shut: Default::default(),
+            work_left: Default::default(),
             attachments: vec![],
             queue_edit: None,
             draft_key: None,

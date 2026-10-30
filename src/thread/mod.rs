@@ -312,14 +312,16 @@ impl ThreadView {
     }
 
     /// What the live rows had becomes their entries': the answer being written passes its parsed
-    /// texts to the answer that replaces it, the live thinking its fold to its piece of work.
-    /// Made anew, either would change on screen at the run's end.
+    /// texts to the answer that replaces it; the live work's line keeps its open-or-shut state
+    /// under its new key. Made anew, either would change on screen at the run's end.
     fn carry_over(&mut self, rows: &[Row]) {
-        let mut shut = self
+        // What the person left open or shut on the live work, by thread: its rows change keys
+        // as the run goes on, and coming back to the thread finds it as left.
+        let mut left = self
             .thread
             .id
             .as_ref()
-            .and_then(|id| self.work_shut.get_mut(id.as_str()));
+            .and_then(|id| self.work_left.get_mut(id.as_str()));
         let t = &mut self.thread;
         for (k, old) in t.tv.rows.iter().enumerate() {
             match (old, rows.get(k)) {
@@ -331,52 +333,17 @@ impl ThreadView {
                     if t.open_work.remove(was) {
                         t.open_work.insert(key.clone());
                     }
-                    if let Some(shut) = shut.as_deref_mut() {
-                        if shut.remove(was) {
-                            shut.insert(key.clone());
+                    if let Some(left) = left.as_deref_mut() {
+                        if left.remove(was) {
+                            left.insert(key.clone());
                         }
                     }
                 }
                 _ => {}
             }
         }
-        // The live work opens on its own: thinking, steps and the agent's words show in the
-        // list they belong to, and the stream's narration enters where its note will sit —
-        // nothing vanishes from a seat of its own. The run's end folds what the view opened;
-        // a person who clicked the line keeps it their way, open or shut — also after leaving
-        // the thread and coming back (`work_shut`).
-        let live_key = |rs: &[Row]| {
-            rs.iter().find_map(|r| match r {
-                Row::Work {
-                    key, live: true, ..
-                } => Some(key.clone()),
-                _ => None,
-            })
-        };
-        let was = live_key(&t.tv.rows);
-        let now = live_key(rows);
-        match (was.as_deref(), now.as_deref(), t.auto_work.as_deref()) {
-            (Some(o), Some(k), Some(a)) if a == o && o != k => {
-                // the run moved to another line of work: the auto-open follows it
-                t.open_work.remove(o);
-                t.open_work.insert(k.to_string());
-                t.auto_work = Some(k.to_string());
-            }
-            (None, Some(k), _)
-                if t.auto_work.is_none()
-                    && !t.open_work.contains(k)
-                    && !shut.as_deref().is_some_and(|s| s.contains(k)) =>
-            {
-                t.open_work.insert(k.to_string());
-                t.auto_work = Some(k.to_string());
-            }
-            (Some(_), None, Some(a)) => {
-                t.open_work.remove(a);
-                t.auto_work = None;
-            }
-            (None, None, Some(_)) => t.auto_work = None,
-            _ => {}
-        }
+        // Nothing opens on its own: a work row shows its counts and, while the run lives, what
+        // the agent is doing now; its steps are the person's to open (`rows/work.rs`).
     }
 
     /// Start parsing the texts of the rows from `from` on, before they are on screen: a row

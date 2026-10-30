@@ -21,13 +21,10 @@ pub struct ActiveThread {
     /// Opened pieces of work, by the work row's key; unfolded steps (work key, step); the source
     /// host whose pages are listed (work key, host).
     pub open_work: HashSet<String>,
-    /// The live work this view opened on its own, so the agent's words show where they will
-    /// settle. The person touching it (either way) takes it over; at the run's end it folds.
-    pub(crate) auto_work: Option<String>,
     /// The step of an opened work opened to its card (work key, step): one per work at a time.
     pub open_steps: HashSet<(String, usize)>,
     /// The one milestone of an opened work shown open, by the work row's key (the milestone's
-    /// first step; `usize::MAX`, none); not set, its last — what the agent does now.
+    /// first step; `usize::MAX`, none); not set, none — every strip is shut until a click.
     pub open_milestone: std::collections::HashMap<String, usize>,
     /// A step's code blocks shown whole past their first lines, by the block's id.
     pub open_fields: HashSet<String>,
@@ -86,7 +83,6 @@ impl Default for ActiveThread {
             journal: Default::default(),
             tv: Default::default(),
             open_work: Default::default(),
-            auto_work: None,
             open_steps: Default::default(),
             step_whole: Default::default(),
             open_fields: Default::default(),

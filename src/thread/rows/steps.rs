@@ -1,5 +1,5 @@
 //! The opened work as strips of milestones: the agent's own words, or a sentence of its calls
-//! where it wrote none, in order, the last open — what the agent does now. Inside a milestone its
+//! where it wrote none, in order, all shut till a click. Inside a milestone its
 //! calls in order, each on a row under the milestone's words, its icon where they start: what it
 //! did, in the agent's own words where it wrote some, and what came back, beside it. A row opens
 //! to its card: why, what the evaluator said, what was sent, what came back. Nothing scrolls but a long command or output inside its own field.
@@ -30,17 +30,15 @@ impl ThreadView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let milestones = steps::milestones(steps);
-        let last = milestones.len().saturating_sub(1);
         let mut rows: Vec<AnyElement> = vec![];
         // Where each milestone's steps start: past the one before, so the reasoning that led to
         // its first call is its own.
         let mut from = 0usize;
-        for (i, m) in milestones.iter().enumerate() {
-            let to = m.steps.iter().copied().max().unwrap_or(from);
-            // One milestone open at a time: the person's choice, else the last.
+        for m in milestones.iter() {
+            let to = m.steps.iter().copied().max().unwrap_or(from);            // One milestone open at a time: only the person's choice, else none.
             let open = match self.thread.open_milestone.get(key) {
                 Some(first) => *first == m.steps[0],
-                None => i == last,
+                None => false,
             };
             let calls: Vec<usize> = m.steps.iter().copied().filter(|k| steps[*k].is_tool()).collect();
             rows.push(self.render_milestone_row(key, steps, m, &calls, open, cx));
