@@ -18,6 +18,7 @@ Everything else you need is in skills. Read one with `skill_view` before you nee
 - `bench-kit`: UI and insert work, and how to look at a change.
 - `bench-structure`: where a new feature, module or file goes, and how to refactor.
 - `pi-durable-dev-rules`: anything in the agent that touches Pi Durable, and how Bench maps onto it.
+- `bench-repo`: before a push, and for the README, its pictures, the About box and the web demo.
 - `gpui-kit`, `rust-best-practices`: the framework and Rust, once the above have no answer.
 
 Why a module is built as it is: its `SPEC.md`, beside its code. The first time you touch a file in a

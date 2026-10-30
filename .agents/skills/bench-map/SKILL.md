@@ -150,10 +150,11 @@ agent/src/
   mcp/, lsp/     MCP servers (mcp.ts, oauth.ts); language servers (lsp.ts, presets.ts)
   telegram.ts, config.ts, store.ts, specs.ts, host.ts, http.ts, instance.ts, repo.ts, audio.ts
 .agents/skills/  what the agent reads: bench-map (this), bench-concepts, bench-kit, bench-structure, pi-durable-dev-rules, gpui-kit
-assets/shots/    the README's pictures
-.agents/skills/  bench-kit (how to change Bench), bench-structure (how to grow it), pi-durable-dev-rules,
-                 gpui-kit and its guides, rust-best-practices
-scripts/         bundle-macos.sh, build-web.sh, gen_themes.py, specs-check.mjs
+assets/shots/    the README's pictures, made by scripts/readme-shots.sh
+.agents/skills/  bench-kit (how to change Bench), bench-structure (how to grow it), bench-repo (the README,
+                 the About box, the web demo, a push), pi-durable-dev-rules, gpui-kit and its guides,
+                 rust-best-practices
+scripts/         bundle-macos.sh, build-web.sh, readme-shots.sh, gen_themes.py, specs-check.mjs
 ```
 
 ## Names worth knowing
