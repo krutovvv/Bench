@@ -20,6 +20,13 @@ pub fn spread(gap: Gap) -> Div {
     row(gap).w_full().justify_between()
 }
 
+/// A box as wide as its column, up to `max`. What keeps an aspect ratio goes inside it, filling it:
+/// on one box, Taffy takes the ratio from the column's width before `max` clamps it, and the
+/// column under a picture keeps a picture's worth of air.
+pub fn at_most_wide(max: Pixels, child: impl IntoElement) -> Div {
+    div().w_full().max_w(max).child(child)
+}
+
 /// Space that takes what is left in a row: what follows goes to the right end.
 pub fn spacer() -> Div {
     div().flex_1()

@@ -261,46 +261,49 @@ impl BenchApp {
             .unwrap_or_default();
 
         // A picture that opens the file: an image itself, or a video's frame or a document's page.
+        // Its own size at most, and narrower with a narrow thread (a dock): the shape kept.
         let picture = |src: ImageSource,
                        size: (f32, f32),
                        max_w: f32,
                        badge: Option<AnyElement>,
-                       tip: SharedString| {
+                       tip: SharedString,
+                       on_click: Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>| {
             let (w, h) = fit(size, max_w, bench_ui::MEDIA_MAX_H);
-            div()
-                .id(id("picture"))
-                .relative()
-                // Its own size at most, and narrower with a narrow thread (a dock): the shape kept.
-                .w_full()
-                .max_w(w)
-                .aspect_ratio(f32::from(w) / f32::from(h).max(1.))
-                .border_1()
-                .rounded_md()
-                .border_color(theme.border)
-                .cursor_pointer()
-                .child(img(src).size_full())
-                .when_some(badge, |d, badge| {
-                    d.child(
-                        div()
-                            .absolute()
-                            .inset_0()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(badge),
-                    )
-                })
-                .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+            bench_ui::at_most_wide(
+                w,
+                div()
+                    .id(id("picture"))
+                    .relative()
+                    .w_full()
+                    .aspect_ratio(f32::from(w) / f32::from(h).max(1.))
+                    .border_1()
+                    .rounded_md()
+                    .border_color(theme.border)
+                    .cursor_pointer()
+                    .child(img(src).size_full())
+                    .when_some(badge, |d, badge| {
+                        d.child(
+                            div()
+                                .absolute()
+                                .inset_0()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .child(badge),
+                        )
+                    })
+                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                    .on_click(on_click),
+            )
         };
         let open_tip: SharedString = format!("{name} — click to open").into();
-        let opener = |local: PathBuf| {
-            move |_: &ClickEvent, _: &mut Window, cx: &mut App| cx.open_with_system(&local)
+        let opener = |local: PathBuf| -> Box<dyn Fn(&ClickEvent, &mut Window, &mut App)> {
+            Box::new(move |_, _, cx| cx.open_with_system(&local))
         };
 
         match kind {
             Kind::Image => match fetched.size {
-                Some(size) => picture(local.clone().into(), size, bench_ui::MEDIA_MAX_W, None, open_tip)
-                    .on_click(opener(local.clone()))
+                Some(size) => picture(local.clone().into(), size, bench_ui::MEDIA_MAX_W, None, open_tip, opener(local.clone()))
                     .into_any_element(),
                 None => row(Some(open_button(local, "Open").into_any_element()), None)
                     .into_any_element(),
@@ -313,10 +316,14 @@ impl BenchApp {
                 match fetched.thumb {
                     Some((thumb, size)) => v_flex()
                         .gap(Gap::Xs)
-                        .child(
-                            picture(thumb.into(), size, bench_ui::MEDIA_PAGE_W, None, open_tip)
-                                .on_click(opener(local.clone())),
-                        )
+                        .child(picture(
+                            thumb.into(),
+                            size,
+                            bench_ui::MEDIA_PAGE_W,
+                            None,
+                            open_tip,
+                            opener(local.clone()),
+                        ))
                         .child(line)
                         .into_any_element(),
                     None => line.into_any_element(),
@@ -349,6 +356,17 @@ impl BenchApp {
                 };
                 let here = crate::media::video::ffmpeg().is_some();
                 let (k2, l2) = (key.clone(), local.clone());
+                let box_size = fit_points(size, bench_ui::MEDIA_MAX_W, bench_ui::MEDIA_MAX_H);
+                let toggle: Box<dyn Fn(&ClickEvent, &mut Window, &mut App)> =
+                    Box::new(cx.listener(move |this, _, window, cx| {
+                        if !here {
+                            cx.open_with_system(&l2);
+                        } else if this.media.video.as_ref().is_some_and(|v| v.key == k2) {
+                            this.stop_video(Some(window), cx);
+                        } else {
+                            this.start_video(k2.clone(), l2.clone(), box_size, window, cx);
+                        }
+                    }));
                 let shown = match (frame, player.is_some()) {
                     (Some(f), _) => picture(
                         ImageSource::Render(f),
@@ -356,6 +374,7 @@ impl BenchApp {
                         bench_ui::MEDIA_MAX_W,
                         None,
                         "Click to stop".into(),
+                        toggle,
                     ),
                     (None, playing) => picture(
                         thumb.into(),
@@ -371,20 +390,12 @@ impl BenchApp {
                         } else {
                             open_tip
                         },
+                        toggle,
                     ),
                 };
-                let box_size = fit_points(size, bench_ui::MEDIA_MAX_W, bench_ui::MEDIA_MAX_H);
                 v_flex()
                     .gap(Gap::Xs)
-                    .child(shown.on_click(cx.listener(move |this, _, window, cx| {
-                        if !here {
-                            cx.open_with_system(&l2);
-                        } else if this.media.video.as_ref().is_some_and(|v| v.key == k2) {
-                            this.stop_video(Some(window), cx);
-                        } else {
-                            this.start_video(k2.clone(), l2.clone(), box_size, window, cx);
-                        }
-                    })))
+                    .child(shown)
                     .child(line)
                     .into_any_element()
             }
@@ -534,17 +545,19 @@ impl BenchApp {
             Some(Loaded::Ready((svg, size))) => {
                 let (w, h) = fit(*size, bench_ui::MEDIA_WIDE_W, bench_ui::DIAGRAM_MAX_H);
                 let open = svg.clone();
-                div()
-                    .id(id)
-                    // As a picture: its size at most, narrower with the thread, its shape kept.
-                    .w_full()
-                    .max_w(w)
-                    .aspect_ratio(f32::from(w) / f32::from(h).max(1.))
-                    .cursor_pointer()
-                    .child(img(svg.clone()).size_full())
-                    .tooltip(|window, cx| Tooltip::new("Diagram — click to open").build(window, cx))
-                    .on_click(move |_, _, cx| cx.open_with_system(&open))
-                    .into_any_element()
+                // As a picture: its size at most, narrower with the thread, its shape kept.
+                bench_ui::at_most_wide(
+                    w,
+                    div()
+                        .id(id)
+                        .w_full()
+                        .aspect_ratio(f32::from(w) / f32::from(h).max(1.))
+                        .cursor_pointer()
+                        .child(img(svg.clone()).size_full())
+                        .tooltip(|window, cx| Tooltip::new("Diagram — click to open").build(window, cx))
+                        .on_click(move |_, _, cx| cx.open_with_system(&open)),
+                )
+                .into_any_element()
             }
             // Not drawable here (a diagram type it lacks, or a syntax slip): its source, as code.
             Some(Loaded::Failed(_)) => {
