@@ -63,13 +63,16 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
 - A scroll column elsewhere (the sidebar, a popover's list):
   `v_flex().id("x").overflow_y_scroll().track_scroll(&handle)`; `ScrollHandle`: `offset()`,
   `max_offset()`, `scroll_to_item(ix)`, `top_item()`.
-- **Such a column scrolls together with every other scrollable under the pointer.** gpui's
-  `track_scroll` listener runs in the Bubble phase for *all* hitboxes the wheel passes — an
-  inner list does not win over the thread's `gpui::list`, both move. Where the wheel belongs to
-  the inner one alone (the `/` list over the thread, a terminal, a browser pane), take the wheel
-  yourself: `.on_scroll_wheel(...)` on the column — set the handle's offset, clamped to
-  `max_offset()` — and `cx.stop_propagation()` (`src/thread/composer/input.rs` `slash_body`,
-  `src/inserts/terminal/view.rs`).
+- **Such a column scrolls together with every other scrollable under the pointer** — gpui's
+  `track_scroll` listener runs in the Bubble phase for *all* hitboxes the wheel passes, so an
+  inner list over the thread's `gpui::list` moves both. Where the wheel belongs to the inner
+  one, dress the scroller in `gpui_base::ScrollableMask::new(Axis::Vertical, &handle)`: it takes
+  axis-dominant wheels in the Capture phase and stops them, giving the wheel to the thread only
+  at the pane's own edge (CSS `overscroll-behavior: auto`). The mask is a **sibling** of the
+  scrolled element sized to its viewport (a child would slide off with the scroll offset):
+  `div().relative().h(px(h)).child(scroller.absolute().inset_0()…).child(ScrollableMask::new(…))`
+  — `inserts::scroll_pane` is that helper, `slash_body` the popup's copy of it.
+  Never hand-write the wheel (`on_scroll_wheel` + `set_offset`): that is a second scroller.
 - **A scroll container ignores the last child's margin** → append a real spacer
   (`div().h_3().flex_none()`).
 - The thread's scrollbar is a Mac's overlay one (`gpui_kit::component::scroll::Scrollbar`); don't add others.

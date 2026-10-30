@@ -12,32 +12,31 @@ use bench_ui::icons::Ico;
 
 use crate::thread::ThreadView;
 
-/// The `/` list's scrollable body: its rows in a window of `rows` rows, and the wheel is the
-/// list's alone — the thread behind it must not run away while the person picks a command.
-/// gpui hands a wheel to every scrollable under the pointer at once, so the list scrolls here,
-/// clamped to what it has, and the event stops (`rows` is how many fit, `row_h` their height).
+/// The `/` list's scrollable body: rows in a window `body_h` tall (as many rows as fit), and the
+/// wheel over it is the list's — the thread behind it must not run away while the person picks
+/// a command. `ScrollableMask` (the same one an insert's pane wears, `inserts::scroll_pane`)
+/// takes the wheel in the capture phase, so the thread's `gpui::list` never sees it; at the
+/// list's edge the wheel goes on to the thread, as a platform scroller's.
 fn slash_body(
     id: &'static str,
-    row_h: f32,
-    rows: f32,
+    body_h: f32,
     scroll: &ScrollHandle,
     items: Vec<AnyElement>,
 ) -> AnyElement {
-    let handle = scroll.clone();
-    v_flex()
-        .id(id)
-        .max_h(px(row_h * rows))
-        .overflow_y_scroll()
-        .track_scroll(&handle)
-        .on_scroll_wheel(move |ev: &ScrollWheelEvent, _, cx| {
-            let line_h = px(row_h);
-            let dy = f32::from(ev.delta.pixel_delta(line_h).y);
-            let max = f32::from(handle.max_offset().y);
-            let next = (f32::from(handle.offset().y) + dy).clamp(-max, 0.).round();
-            handle.set_offset(point(px(0.), px(next)));
-            cx.stop_propagation();
-        })
-        .children(items)
+    div()
+        .relative()
+        .w_full()
+        .h(px(body_h))
+        .child(
+            v_flex()
+                .id(id)
+                .absolute()
+                .inset_0()
+                .overflow_y_scroll()
+                .track_scroll(scroll)
+                .children(items),
+        )
+        .child(gpui_base::ScrollableMask::new(Axis::Vertical, scroll))
         .into_any_element()
 }
 
@@ -68,6 +67,7 @@ impl ThreadView {
         } else {
             bench_ui::TURN_Y + 30.
         };
+        let n = matches.len();
         let rows: Vec<AnyElement> = matches.into_iter().enumerate().map(|(i, c)| {
             let on = i == sel;
             h_flex()
@@ -120,7 +120,12 @@ impl ThreadView {
                         .rounded_md()
                         .border_color(theme.border)
                         .py_1()
-                        .child(slash_body("slash-list", SLASH_ROW, SLASH_ROWS, &self.slash_scroll, rows)),
+                        .child(slash_body(
+                            "slash-list",
+                            (n as f32).min(SLASH_ROWS) * SLASH_ROW,
+                            &self.slash_scroll,
+                            rows,
+                        )),
                 )
                 .into_any_element(),
         )
@@ -136,6 +141,7 @@ impl ThreadView {
         theme: &gpui_kit::component::Theme,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let n = matches.len();
         let rows: Vec<AnyElement> = matches.into_iter().enumerate().map(|(i, c)| {
             let on = i == sel;
             let (fg, quiet, faint) = if on {
@@ -193,8 +199,7 @@ impl ThreadView {
                     .p_1()
                     .child(slash_body(
                         "slash-list",
-                        bench_ui::COMPLETION_ROW_H,
-                        SLASH_ROWS,
+                        (n as f32).min(SLASH_ROWS) * bench_ui::COMPLETION_ROW_H,
                         &self.slash_scroll,
                         rows,
                     )),

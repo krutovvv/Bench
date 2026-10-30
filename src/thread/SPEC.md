@@ -43,7 +43,8 @@ deletes threads (`open.rs`).
   screenful costs.
 - Only the thread scrolls (with a Mac overlay scrollbar); a block inside it does not scroll on
   its own, except a terminal, an editor, or a tool pane with its own wheel. Where a block does
-  have its wheel, the thread behind it holds still: the block takes the event and stops it.
+  have its wheel, a `ScrollableMask` over it is the wheel's owner, and the thread behind it
+  holds still.
 
 ## Decisions
 
