@@ -46,6 +46,7 @@ Find the row for your change, open that file, and look at its folder too.
 | change what a thread on screen keeps (its composer, its run, its events) | `src/thread/view.rs` (`ThreadView`), its state `src/thread/active.rs` (`ActiveThread`, `ThreadRef`) |
 | change the second thread beside the open one (kept in code, not offered in the menu) or the right dock's thread head | `src/thread/beside.rs`, `src/thread/panel.rs` |
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
+| change Bench's sounds (the mic, a run's end, a question) | `src/media/sound.rs` (what plays, its switch `sounds.json`), the files `assets/sounds/` written by `scripts/make-sounds.py`; when they play: `src/media/voice.rs`, `src/app/events.rs`; the switch in the gear's Appearance `src/settings/appearance.rs` |
 | change dictation (the mic, text while speaking: pieces sent at pauses) | `src/media/voice.rs`, the pauses `src/media/pauses.rs` (tests), the recorder `src/media/audio.rs`; its switch in the gear's Voice (`src/settings/voice.rs`), kept in `dictation.json` |
 | change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu; loading projects: `project_list.rs`; which Telegram threads show: `telegram.rs`); what is done to a thread or project there — pin (a thread's), color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
 | the projects' order in the sidebar: a project's group dragged above or below another | `src/sidebar/order.rs` (the order, `project_rank`, `drop_zone`, `drag_list`, kept in `project-order.json`), its handle the head and its place the whole group in `project_row.rs`, the sort in `items.rs`, the end of the list in `mod.rs` (a project has no pin; a thread does, `marks.rs`); the line and the half-of-a-block arithmetic `bench_ui::drop_line`, `drop_edge` |
@@ -127,7 +128,7 @@ src/
                  specs/, statusbar.rs (SPEC.md)
   media/         what an answer carries besides text and how it shows: view.rs, text.rs, playback.rs,
                  chip.rs, fetch.rs, diagram.rs, latex.rs; attachments and sound: attach.rs, audio.rs,
-                 video.rs, voice.rs, pauses.rs
+                 video.rs, voice.rs, pauses.rs, sound.rs
   system/        what Bench asks of the machine: ssh.rs, sshconfig.rs, notify.rs
   demo/          a fake agent for screenshots and the web demo: hooks.rs, script.rs, agent.rs, env.rs,
                  threads.rs, journal.rs, probes.rs

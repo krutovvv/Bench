@@ -78,6 +78,7 @@ impl BenchApp {
             return true;
         }
         if self.media.recorder.take().is_some() {
+            crate::media::sound::Sound::MicOff.play();
             self.media.wave_ticker = None;
             self.media.send_after_transcribe = false;
             // Dictation by pauses is dropped whole: the pieces still out land nowhere.

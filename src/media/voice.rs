@@ -8,6 +8,7 @@ use gpui_kit::*;
 
 use crate::client::rest;
 use crate::media::audio::Recorder;
+use crate::media::sound::Sound;
 use crate::media::pauses::{Cut, commit_pause, ends_sentence, predict, worth_a_run};
 use crate::media::state::{KEPT_RUNS, LiveDictation};
 
@@ -27,6 +28,7 @@ impl BenchApp {
     /// stopping is the last pause: the whole speech once more, only when some came after the last run.
     pub fn toggle_mic(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(rec) = self.media.recorder.take() {
+            Sound::MicOff.play();
             if self.media.live.is_some() {
                 self.stop_live(rec, window, cx);
                 cx.notify();
@@ -81,6 +83,7 @@ impl BenchApp {
         } else {
             match Recorder::start() {
                 Ok(r) => {
+                    Sound::MicOn.play();
                     self.media.recorder = Some(r);
                     self.media.live = self.media.live_pref.then(LiveDictation::new);
                     let mut tick = 0u32;

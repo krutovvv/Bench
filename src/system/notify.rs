@@ -5,6 +5,7 @@
 //! macOS asks the person once ("Bench would like to send notifications"); after that the
 //! choice is theirs, in System Settings → Notifications.
 
+use super::bundled;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -48,13 +49,6 @@ pub fn check() {
         );
     });
     center.getNotificationSettingsWithCompletionHandler(&done);
-}
-
-/// Running from inside an .app bundle (the only place notifications can work).
-fn bundled() -> bool {
-    std::env::current_exe()
-        .map(|p| p.to_string_lossy().contains(".app/Contents/MacOS/"))
-        .unwrap_or(false)
 }
 
 /// Ask for permission once, at start (macOS shows its prompt only the first time).

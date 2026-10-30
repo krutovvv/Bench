@@ -5,6 +5,7 @@
 use protocol::{Event, ThreadEvent, ThreadId};
 
 use super::*;
+use crate::media::sound::Sound;
 use crate::thread::store::ThreadRow;
 use crate::thread::ThreadView;
 
@@ -48,6 +49,21 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         let views = self.views_of(host, thread, cx);
+        // A question the person has not been told of yet: the agent repeats the list it waits on.
+        if let (ThreadEvent::Asks(asks), Some(view)) = (&event, views.first()) {
+            let known = view.read(cx).thread.journal.asks();
+            if asks.iter().any(|a| !known.iter().any(|k| k.id == a.id)) {
+                Sound::NeedsYou.play();
+            }
+        }
+        // Where the failure is written: the agent says so after the run's end as often as before.
+        if let (ThreadEvent::Append(items), false) = (&event, views.is_empty())
+            && items.iter().any(|it| {
+                matches!(it, protocol::ThreadItem::Fail { .. } | protocol::ThreadItem::Text { error: Some(_), .. })
+            })
+        {
+            Sound::AgentFailed.play();
+        }
         for view in &views {
             view.update(cx, |v, cx| v.on_thread_event(&event, window, cx));
         }
@@ -84,6 +100,10 @@ impl BenchApp {
     /// A run of a thread on screen ended: the files its agent's machine has may have changed, and
     /// the person, when Bench is behind other windows, is told.
     fn run_ended(&mut self, view: &Entity<ThreadView>, window: &mut Window, cx: &mut Context<Self>) {
+        // Stopped halfway (the person's Stop) it is silent, and a failure has its own sound.
+        if view.read(cx).thread.journal.answered() {
+            Sound::AgentDone.play();
+        }
         let at = view.read(cx).thread_ref();
         // Every copy we cached of that agent's machine is stale now; the next look brings the
         // current one. It may also have committed in any repo the windows show: the chips re-read.
@@ -156,6 +176,7 @@ impl BenchApp {
                     &old.title
                 };
                 crate::system::notify::post(old.id.as_str(), title, "The agent finished");
+                Sound::AgentDone.play();
             }
         }
         self.threads.list.retain(|s| s.host != host);

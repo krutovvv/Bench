@@ -7,3 +7,11 @@ pub mod notify;
 pub mod notify;
 pub mod ssh;
 pub mod sshconfig;
+
+/// Running from inside an .app bundle: the person's Bench, not a bare build (the only place
+/// notifications can work, and the only one that makes a sound).
+pub fn bundled() -> bool {
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().contains(".app/Contents/MacOS/"))
+        .unwrap_or(false)
+}

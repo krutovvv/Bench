@@ -8,6 +8,7 @@ use bench_ui::Gap;
 use bench_ui::theme::Appearance;
 
 use crate::app::BenchApp;
+use crate::media::sound;
 
 pub fn load() -> Appearance {
     Appearance::load_from(&crate::client::connection::state_dir())
@@ -58,10 +59,20 @@ impl BenchApp {
         .into_any_element();
         // The page's own width: these rows are rows of the same list, and a narrower column for
         // them alone read as a mistake (their rules ended short of every other rule).
+        let sounds = gpui_kit::component::switch::Switch::new("sounds")
+            .checked(sound::enabled())
+            .on_click(cx.listener(|_, on: &bool, _, cx| {
+                sound::set_enabled(*on);
+                // What was switched on, heard at once.
+                sound::Sound::AgentDone.play();
+                cx.notify();
+            }))
+            .into_any_element();
         v_flex().w_full().child(
             v_flex()
                 .w_full()
-                .child(row("Mode", "Light, dark, or follow macOS.", mode)),
+                .child(row("Mode", "Light, dark, or follow macOS.", mode))
+                .child(row("Sounds", "Soft sounds for the mic, a finished run and a question.", sounds)),
         )
     }
 }

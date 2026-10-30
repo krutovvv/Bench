@@ -13,7 +13,7 @@ references: [agent, agent-judge, projects-and-agents]
 The app's settings (Bench → Settings…, ⌘,), a page in the center (`Center::Settings`), in tabs:
 Agents (each agent's providers, voice and evaluator servers; servers' agents added and removed),
 Presets (MCP and language servers a project takes with one click, compaction shares, reasoning
-levels), Appearance. The new project's page is here too (`new_project.rs`, `Center::NewProject`).
+levels), Appearance (the mode and whether Bench makes its sounds). The new project's page is here too (`new_project.rs`, `Center::NewProject`).
 What the gear keeps while it is open is `Gear` (`state.rs`).
 
 ## Boundary

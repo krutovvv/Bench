@@ -157,6 +157,28 @@ pub fn decodable(bytes: &[u8]) -> bool {
     rodio::Decoder::new(Cursor::new(bytes.to_vec())).is_ok()
 }
 
+/// Plays a clip on this thread, to its end or until `stop` is set.
+fn play(bytes: Vec<u8>, stop: &AtomicBool) {
+    let run = || -> Result<()> {
+        let (_stream, handle) = rodio::OutputStream::try_default()?;
+        let sink = rodio::Sink::try_new(&handle)?;
+        sink.append(rodio::Decoder::new(Cursor::new(bytes))?);
+        while !sink.empty() && !stop.load(Ordering::Relaxed) {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        sink.stop();
+        Ok(())
+    };
+    if let Err(e) = run() {
+        eprintln!("[audio] playback: {e}");
+    }
+}
+
+/// Plays a short clip to its end on a background thread, nothing holding on to it.
+pub fn play_out(bytes: Vec<u8>) {
+    std::thread::spawn(move || play(bytes, &AtomicBool::new(false)));
+}
+
 /// Plays one clip on a background thread; `stop()` or drop ends it.
 pub struct Playback {
     stop: Arc<AtomicBool>,
@@ -171,19 +193,7 @@ impl Playback {
         let s = stop.clone();
         std::thread::spawn(move || {
             let _end = end;
-            let run = || -> Result<()> {
-                let (_stream, handle) = rodio::OutputStream::try_default()?;
-                let sink = rodio::Sink::try_new(&handle)?;
-                sink.append(rodio::Decoder::new(Cursor::new(bytes))?);
-                while !sink.empty() && !s.load(Ordering::Relaxed) {
-                    std::thread::sleep(Duration::from_millis(50));
-                }
-                sink.stop();
-                Ok(())
-            };
-            if let Err(e) = run() {
-                eprintln!("[audio] playback: {e}");
-            }
+            play(bytes, &s);
         });
         Self { stop, ended }
     }
