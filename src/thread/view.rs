@@ -71,7 +71,7 @@ impl ThreadView {
     pub fn new(app: WeakEntity<BenchApp>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let composer = cx.new(|cx| {
             TextareaState::new(window, cx)
-                .auto_grow(1, 100_000)
+                .auto_grow(1, bench_ui::COMPOSER_MAX_LINES)
                 // As in Telegram: Enter sends, Shift+Enter (or ⌘Enter) is a new line.
                 .submit_on_enter(true)
                 // One quiet line on an empty row: what it is and its two keys.

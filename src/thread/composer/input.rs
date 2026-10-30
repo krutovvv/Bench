@@ -267,6 +267,8 @@ impl ThreadView {
             .and_then(|a| a.read(cx).media.recorder.as_ref().map(|r| r.level().min(1.)))
             .unwrap_or(0.);
         let empty = self.composer.read(cx).value().trim().is_empty();
+        // Whether Send has anything to send: words, files or code sent from the Explorer.
+        let nothing = empty && self.attachments.is_empty() && self.thread_references(cx).is_empty();
 
         // Empty: level with the avatar, at the text's right column. Once a single character
         // is there, they leave the gutter and travel below the field, a line of their own
@@ -387,7 +389,7 @@ impl ThreadView {
                 .flex()
                 .items_center()
                 .justify_center()
-                .cursor_pointer()
+                .when(live || !nothing, |d| d.cursor_pointer())
                 .map(|d| {
                     if live {
                         d.bg(theme.foreground).child(
@@ -396,7 +398,7 @@ impl ThreadView {
                                 .rounded(px(bench_ui::HAIRLINE * 2.))
                                 .bg(theme.background),
                         )
-                    } else if empty {
+                    } else if nothing {
                         d.bg(theme.foreground.opacity(0.07))
                             .text_color(theme.muted_foreground)
                             .child(Ico::ArrowUp.icon().small())
@@ -406,23 +408,26 @@ impl ThreadView {
                             .child(Ico::ArrowUp.icon().small())
                     }
                 })
-                .tooltip(move |window, cx| {
-                    Tooltip::new(if live { "Stop  ⌘." } else { "Send  ⌘⏎" }).build(window, cx)
-                })
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    if live {
-                        if let Some(thread) = this.thread.id.clone() {
-                            this.tell(protocol::StopThread { thread }, cx);
+                // Nothing to send: a quiet disc that does nothing, says nothing.
+                .when(live || !nothing, |d| {
+                    d.tooltip(move |window, cx| {
+                        Tooltip::new(if live { "Stop  ⌘." } else { "Send  ⏎" }).build(window, cx)
+                    })
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        if live {
+                            if let Some(thread) = this.thread.id.clone() {
+                                this.tell(protocol::StopThread { thread }, cx);
+                            }
+                        } else {
+                            this.send(window, cx);
                         }
-                    } else {
-                        this.send(window, cx);
-                    }
-                }))
+                    }))
+                })
         });
         // A Large textarea pads its text 12 left and 10 above and below (gpui-component's
         // input_px/py): pulled back by exactly that, so its first line sits where a message's
-        // does. Large = the messages' size; it grows with the text (no scroll of its own: the
-        // thread scrolls). The leading is set on the field itself — the library's input pins a
+        // does. Large = the messages' size; it grows with the text up to COMPOSER_MAX_LINES, then
+        // scrolls inside. The leading is set on the field itself — the library's input pins a
         // line height inside — and it must be given in REM: the widget builds its rows from an
         // absolute leading and lets a relative one fall through to the font's own 1.41 em. 1.5rem
         // is the thread's leading exactly, since the thread's prose is 1rem.

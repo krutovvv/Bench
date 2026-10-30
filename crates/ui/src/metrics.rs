@@ -79,6 +79,9 @@ pub const SMALL_BUTTON_H: f32 = 24.;
 /// The line under the composer (its project, repo, meters), as Claude's: its small buttons'
 /// height, so their hover is all the air between it and the field.
 pub const COMPOSER_FOOT_H: f32 = SMALL_BUTTON_H;
+/// The tallest the pinned composer grows, in lines; past it the text scrolls inside the field, so
+/// Send and the thread stay on screen whatever is pasted.
+pub const COMPOSER_MAX_LINES: usize = 16;
 /// The air inside the card around its line (the buttons'; the text is centred on their height).
 pub const COMPOSER_CARD_PY: f32 = 8.;
 /// Its sides: the plus and Send set in by this from the card's rule.
