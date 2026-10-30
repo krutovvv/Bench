@@ -138,7 +138,10 @@ pub fn open_main_window(cx: &mut App) {
             }
         });
         // The interceptor lives as long as the app.
-        app.update(cx, |this, _| this._slash_keys = Some(keystrokes));
+        app.update(cx, |this, cx| {
+            this._slash_keys = Some(keystrokes);
+            this.observe_changes(window, cx);
+        });
         demo::attach(&app, window, cx);
         app
     }) {

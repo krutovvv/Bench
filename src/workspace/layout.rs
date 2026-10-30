@@ -55,21 +55,6 @@ fn file_layer(cx: &mut Context<BenchApp>) -> Div {
 
 impl Render for BenchApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // The prompts offered with `@` follow the open thread's project.
-        let project = self.thread(cx).project.clone();
-        if self.local_conn().is_some()
-            && self.threads.prompts_for.as_deref() != Some(project.as_str())
-        {
-            self.threads.prompts_for = Some(project);
-            self.load_prompts(window, cx);
-        }
-        // The server browser's stream follows what is on screen (no frames for a hidden thread).
-        #[cfg(not(target_family = "wasm"))]
-        {
-            let at = self.thread_ref(cx);
-            self.update_browser_stream(&at);
-        }
-        self.note_place(cx);
         let theme = cx.theme().clone();
         let body = match self.center {
             Center::Chat => div()

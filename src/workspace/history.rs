@@ -101,7 +101,7 @@ impl BenchApp {
         }
     }
 
-    /// Called from the window's render: whatever opened it, the place shown is remembered.
+    /// Whatever opened it, the place shown is remembered (`app/subscriptions.rs`).
     pub(crate) fn note_place(&mut self, cx: &App) {
         let shown = self.shown_place(cx);
         self.nav.note(shown);

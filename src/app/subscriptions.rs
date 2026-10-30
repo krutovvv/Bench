@@ -58,6 +58,34 @@ impl BenchApp {
         ]
     }
 
+    /// What follows whatever changed in the window: the app or its open thread notified, this
+    /// runs, not a frame. Zed subscribes to the active item the same way.
+    pub fn observe_changes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let app = cx.entity();
+        let thread = self.active_thread.clone();
+        self._subscriptions.extend([
+            cx.observe_in(&app, window, |this, _, window, cx| this.follow_shown(window, cx)),
+            cx.observe_in(&thread, window, |this, _, window, cx| this.follow_shown(window, cx)),
+        ]);
+    }
+
+    /// What depends on what is on screen: the prompts `@` offers are the open thread's project's,
+    /// the server browser streams only what shows (no frames for a hidden thread), and the place
+    /// shown is remembered, whatever opened it.
+    fn follow_shown(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let project = self.thread(cx).project.clone();
+        if self.local_conn().is_some() && self.threads.prompts_for.as_deref() != Some(project.as_str()) {
+            self.threads.prompts_for = Some(project);
+            self.load_prompts(window, cx);
+        }
+        #[cfg(not(target_family = "wasm"))]
+        {
+            let at = self.thread_ref(cx);
+            self.update_browser_stream(&at);
+        }
+        self.note_place(cx);
+    }
+
     pub(super) fn timers(_window: &mut Window, cx: &mut Context<Self>) -> Vec<Task<()>> {
         // The live clocks: a run's meters, a clip's time.
         let ticker = cx.spawn(async move |this, cx| {
