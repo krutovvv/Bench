@@ -344,6 +344,7 @@ export class Journal {
 			running: live.busy,
 			holds: live.busy ? live.holds : [],
 			...(rt.streams.placeOf(id) ? { in_line: rt.streams.placeOf(id) } : {}),
+			parked: rt.parked.of(live.conversation.id),
 			processes: await rt.processes.list(live.conversation.id),
 			asks: rt.asks.of(live),
 			info: rt.models.info(live.row),

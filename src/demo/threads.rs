@@ -229,6 +229,7 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
         if hooks.clarify.is_some() {
             clarify(hooks, open);
         }
+        open.parked = hooks.parked.is_some();
         if let Some(place) = hooks.in_line.as_ref().and_then(|n| n.parse().ok()) {
             open.running = true;
             open.in_line = Some(place);

@@ -145,6 +145,8 @@ requests! {
     }
     /// Stop the run: what it does now ends, the queue stays.
     StopThread = "thread.stop" -> Done { thread: ThreadId }
+    /// Run again the work Pi stopped after too many restarts.
+    RetryThread = "thread.retry" -> Done { thread: ThreadId }
     /// Hold the run at its next step (`paused`), or let it go on.
     PauseThread = "thread.pause" -> Done { thread: ThreadId, paused: bool }
     /// Take a waiting message (its submission `sub`) back out of the queue.

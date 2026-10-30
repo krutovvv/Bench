@@ -78,6 +78,8 @@ hooks! {
     gear_tab = "BENCH_GEAR_TAB",
     /// <n>: the open thread n-th in the line of threads waiting for a stream of the model.
     in_line = "BENCH_DEMO_LINE",
+    /// 1: its work stopped by Pi after too many restarts.
+    parked = "BENCH_DEMO_PARKED",
     /// Two messages and a plan waiting.
     queue = "BENCH_DEMO_QUEUE",
     /// These words in the composer.

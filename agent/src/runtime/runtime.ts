@@ -24,6 +24,7 @@ import { projects } from "../builtin/projects.ts";
 import { AGENT_HOME, agents, defaultCwd, getSetting, readAgent, readConfig, reasoningEffort, setSetting } from "../config.ts";
 import { forAgent, installMcp, loadExtensions } from "../extensions.ts";
 import { HoldDoc, Holds, type Hold } from "./hold.ts";
+import { Parked } from "./parked.ts";
 import { Streams } from "./streams.ts";
 import { setHost } from "../host.ts";
 import { envFor, hostOf } from "./tools-host.ts";
@@ -105,6 +106,7 @@ export class Runtime {
 	readonly journal = new Journal(this);
 	readonly holds = new Holds(this);
 	readonly streams = new Streams(this);
+	readonly parked = new Parked(this);
 	readonly queue = new Queue(this);
 	readonly asks = new Asks(this);
 	readonly inserts = new ThreadInserts(this);
@@ -164,8 +166,18 @@ export class Runtime {
 				// person's next message. "continue" fed every waiting message to a model that could not
 				// be reached, and a whole queue was spent on "Connection error." in a minute.
 			},
-			onReport: (error: unknown, info: any) => console.error("[pi]", info?.type, String((error as Error)?.message ?? error).slice(0, 300)),
+			onReport: (error: unknown, info: any) => {
+				if (info?.type === "task_parked") this.parked.note(info.task);
+				console.error("[pi]", info?.type, String((error as Error)?.message ?? error).slice(0, 300));
+			},
 		} as any, ctx);
+		// A storage error closes the harness by itself: nothing works from here, so the agent ends
+		// and its service brings it back, as Pi's guide has a host do.
+		void this.harness.closed.then((end: any) => {
+			if (end?.reason !== "failed") return;
+			console.error("[pi] closed by a failure", end.error);
+			process.exit(1);
+		});
 		// Every model a stored session uses must be known before Pi resumes unfinished runs.
 		for (const row of this.store.list({ limit: 10000 })) {
 			try {
@@ -176,6 +188,7 @@ export class Runtime {
 		this.harness.resume();
 		// Runs a previous process left unfinished continue now: watch their sessions so their
 		// answers reach the index and Bench sees them as running.
+		await this.parked.load();
 		const graph = await this.harness.taskGraph(ctx);
 		const conversations = new Set(Object.values((graph.value as any).tasks ?? {}).map((t: any) => String(t.conversationId)));
 		graph.dispose?.();

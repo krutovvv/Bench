@@ -316,6 +316,9 @@ pub struct ThreadOpen {
     #[ts(optional)]
     #[serde(default)]
     pub in_line: Option<u32>,
+    /// Pi stopped its work after too many restarts, until asked to run it again.
+    #[serde(default)]
+    pub parked: bool,
     #[serde(default)]
     pub info: ThreadInfo,
     /// Its numbers so far; `None` before its first answer.
@@ -557,6 +560,8 @@ pub enum ThreadEvent {
     Holds(Vec<Hold>),
     /// Its place in the line of threads waiting for a stream of the model, from 1; `None`: out of it.
     Line(Option<u32>),
+    /// Pi stopped its work after too many restarts, or it runs again.
+    Parked(bool),
     /// A background process started, wrote output or ended: its record, whole.
     Process(Process),
     /// What the live run waits for the person to answer, whole.

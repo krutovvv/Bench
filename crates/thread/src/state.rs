@@ -28,6 +28,8 @@ pub struct Thread {
     holds: Vec<Hold>,
     /// Its place in the line of threads waiting for a stream of the model.
     in_line: Option<u32>,
+    /// Pi stopped its work after too many restarts.
+    parked: bool,
     /// The background processes, as their last record said (`thread.process`).
     processes: Vec<Process>,
     /// What the live run waits for the person to answer.
@@ -59,6 +61,7 @@ impl Thread {
             running: o.running,
             holds: o.holds,
             in_line: o.in_line,
+            parked: o.parked,
             processes: o.processes,
             asks: o.asks,
             info: o.info,
@@ -78,6 +81,7 @@ impl Thread {
         self.running = o.running;
         self.holds = o.holds;
         self.in_line = o.in_line;
+        self.parked = o.parked;
         self.processes = o.processes;
         self.asks = o.asks;
         self.info = o.info;
@@ -128,6 +132,7 @@ impl Thread {
             }
             ThreadEvent::Holds(h) => self.holds = h,
             ThreadEvent::Line(place) => self.in_line = place,
+            ThreadEvent::Parked(on) => self.parked = on,
             ThreadEvent::Process(p) => match self.processes.iter_mut().find(|x| x.id == p.id) {
                 Some(x) => *x = p,
                 None => self.processes.push(p),
@@ -211,6 +216,7 @@ impl Thread {
             &self.queue,
             &self.sent_queue,
             &self.processes,
+            self.parked,
         )
     }
 

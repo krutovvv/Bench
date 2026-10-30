@@ -72,6 +72,11 @@ export default ({ rt }: Ctx): Module => ({
 			await rt.interrupt(thread);
 			return {};
 		},
+		// Work Pi parked after too many restarts runs again.
+		"thread.retry": async ({ thread }) => {
+			await rt.parked.retry(rt.store.get(thread)?.conversation);
+			return {};
+		},
 		// The person's hold: stand the run at its next step boundary, then let it go on.
 		"thread.pause": async ({ thread, paused }) => {
 			await (paused ? rt.holds.pause(thread) : rt.holds.resume(thread));

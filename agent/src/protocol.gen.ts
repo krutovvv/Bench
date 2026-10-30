@@ -72,7 +72,11 @@ asks: Array<Ask>,
 /**
  * Its place in the line of threads waiting for a stream of the model, from 1; `None`: not in it.
  */
-in_line?: number, info: ThreadInfo, 
+in_line?: number, 
+/**
+ * Pi stopped its work after too many restarts, until asked to run it again.
+ */
+parked: boolean, info: ThreadInfo, 
 /**
  * Its numbers so far; `None` before its first answer.
  */
@@ -170,7 +174,7 @@ export type ProcessState = "running" | "exited" | "stopped" | "restarted" | "fai
 
 export type StreamKind = "text" | "thought" | "narration";
 
-export type ThreadEvent = { "kind": "append", "value": Array<ThreadItem> } | { "kind": "stream", "value": [StreamKind, string] } | { "kind": "queue", "value": Array<QueuedItem> } | { "kind": "inserts", "value": { [key in string]?: InsertState } } | { "kind": "run", "value": boolean } | { "kind": "holds", "value": Array<Hold> } | { "kind": "line", "value": number | null } | { "kind": "process", "value": Process } | { "kind": "asks", "value": Array<Ask> } | { "kind": "info", "value": ThreadInfo } | { "kind": "usage", "value": Usage };
+export type ThreadEvent = { "kind": "append", "value": Array<ThreadItem> } | { "kind": "stream", "value": [StreamKind, string] } | { "kind": "queue", "value": Array<QueuedItem> } | { "kind": "inserts", "value": { [key in string]?: InsertState } } | { "kind": "run", "value": boolean } | { "kind": "holds", "value": Array<Hold> } | { "kind": "line", "value": number | null } | { "kind": "parked", "value": boolean } | { "kind": "process", "value": Process } | { "kind": "asks", "value": Array<Ask> } | { "kind": "info", "value": ThreadInfo } | { "kind": "usage", "value": Usage };
 
 export type Event = { "type": "threads_changed" } | { "type": "thread", thread: ThreadId, event: ThreadEvent, } | { "type": "env_changed", project: string, };
 
@@ -250,6 +254,8 @@ effort: string | null, };
 
 export type StopThread = { thread: ThreadId, };
 
+export type RetryThread = { thread: ThreadId, };
+
 export type PauseThread = { thread: ThreadId, paused: boolean, };
 
 export type WithdrawQueued = { thread: ThreadId, sub: string, };
@@ -274,4 +280,4 @@ export type ListCommands = Record<string, never>;
 
 export type StopProcess = { thread: ThreadId, process: string, };
 
-export type Methods = { "threads.list": [ListThreads, Array<ThreadSummary>], "thread.create": [CreateThread, Created], "thread.open": [OpenThread, ThreadOpen], "thread.rename": [RenameThread, Done], "thread.review": [ReviewTurn, Done], "thread.delete": [DeleteThread, Done], "thread.fork": [ForkThread, Created], "thread.send": [SendMessage, Done], "thread.stop": [StopThread, Done], "thread.pause": [PauseThread, Done], "thread.queue.withdraw": [WithdrawQueued, Done], "thread.queue.send": [SendQueuedNow, Done], "thread.queue.edit": [EditQueued, Done], "thread.insert": [PutInsert, Done], "thread.insert.patch": [PatchInsert, Done], "thread.answer": [AnswerAsk, Done], "thread.effort": [SetEffort, Done], "thread.speed": [SaveSpeed, Done], "thread.command": [RunCommand, CommandResult], "commands.list": [ListCommands, Array<Command>], "process.stop": [StopProcess, Done] };
+export type Methods = { "threads.list": [ListThreads, Array<ThreadSummary>], "thread.create": [CreateThread, Created], "thread.open": [OpenThread, ThreadOpen], "thread.rename": [RenameThread, Done], "thread.review": [ReviewTurn, Done], "thread.delete": [DeleteThread, Done], "thread.fork": [ForkThread, Created], "thread.send": [SendMessage, Done], "thread.stop": [StopThread, Done], "thread.retry": [RetryThread, Done], "thread.pause": [PauseThread, Done], "thread.queue.withdraw": [WithdrawQueued, Done], "thread.queue.send": [SendQueuedNow, Done], "thread.queue.edit": [EditQueued, Done], "thread.insert": [PutInsert, Done], "thread.insert.patch": [PatchInsert, Done], "thread.answer": [AnswerAsk, Done], "thread.effort": [SetEffort, Done], "thread.speed": [SaveSpeed, Done], "thread.command": [RunCommand, CommandResult], "commands.list": [ListCommands, Array<Command>], "process.stop": [StopProcess, Done] };

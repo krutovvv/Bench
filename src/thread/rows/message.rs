@@ -236,4 +236,27 @@ impl ThreadView {
         )
         .into_any_element()
     }
+
+    /// Pi will not run this work again by itself: it was cut off too many times with nothing new.
+    pub(crate) fn render_parked(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let view = self.thread.id.clone();
+        crate::thread::look::turn(
+            Some(true),
+            bench_ui::row(Gap::M)
+                .text_color(theme.danger)
+                .child("The run stopped: it was cut off by too many restarts.")
+                .child(
+                    bench_ui::compact_button("parked-retry", "Run again").on_click(cx.listener(
+                        move |this, _, _, cx| {
+                            if let Some(thread) = view.clone() {
+                                this.tell(protocol::RetryThread { thread }, cx);
+                            }
+                        },
+                    )),
+                ),
+            cx,
+        )
+        .into_any_element()
+    }
 }

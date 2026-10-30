@@ -94,6 +94,7 @@ with `BENCH_DEMO` set.
 | `BENCH_DEMO_RENAME` | `<thread id>` | That thread being renamed |
 | `BENCH_DEMO_POP` | `agent` | The agent's popover open, with long lines in its log |
 | `BENCH_DEMO_DROP` | `chat`, `between`, `right`, `foot`, `side`, `tint` | A file carried into the window there and dropped; `tint` held there, undropped |
+| `BENCH_DEMO_PARKED` | `1` | The open thread's work stopped by Pi after too many restarts, its Run again |
 | `BENCH_DEMO_CLICK` | `<x>,<y>` | The left button pressed and let go there, two seconds in |
 | `BENCH_DEMO_DRAG` | `<x>,<y>:<x>,<y>[:hold]` | The left button pressed at the first place, carried to the second and let go there (`hold`: kept down, the picture shows the drag live). A real pointer moving over the copy can end it |
 | `BENCH_TOOLS_SHOWN` | `1` | The composer's hover tools shown at rest |

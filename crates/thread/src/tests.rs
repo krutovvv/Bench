@@ -165,6 +165,7 @@ fn kinds(rows: &[Row]) -> Vec<String> {
                 review.as_ref().map_or(String::new(), |(f, _)| format!("·r{}", f.len()))
             ),
             Row::Writing { text, .. } => format!("writing:{text}"),
+            Row::Parked => "parked".into(),
             Row::Queued { text, .. } => format!("queued:{text}"),
         })
         .collect()
@@ -1078,4 +1079,12 @@ fn its_place_in_the_line_comes_and_goes_with_the_run() {
     t.apply(ThreadEvent::Line(Some(3)));
     t.apply(ThreadEvent::Run(false));
     assert_eq!(t.in_line(), None, "a run that ended is in no line");
+}
+
+#[test]
+fn work_pi_parked_is_a_row_until_it_runs_again() {
+    let mut t = Thread::open(ThreadOpen { parked: true, ..Default::default() });
+    assert!(matches!(t.rows().last(), Some(Row::Parked)));
+    t.apply(ThreadEvent::Parked(false));
+    assert!(t.rows().is_empty());
 }

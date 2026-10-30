@@ -63,6 +63,8 @@ pub enum Row {
     },
     /// The answer being written now (its text; the model's reasoning is not shown while it streams).
     Writing { text: String },
+    /// Pi stopped the work after too many restarts: it waits to be asked to run it again.
+    Parked,
     /// A message waiting for the agent.
     Queued {
         key: String,
@@ -113,6 +115,7 @@ impl Row {
             | Row::Changes { key, .. }
             | Row::Queued { key, .. } => key,
             Row::Writing { .. } => "writing",
+            Row::Parked => "parked",
         }
     }
 }
@@ -153,6 +156,7 @@ pub(crate) fn rows_of(
     queue: &[QueuedItem],
     sent_queue: &[Pressed],
     processes: &[Process],
+    parked: bool,
 ) -> Vec<Row> {
     // A question's answer is its call's result, which comes later in the journal.
     let asked: HashMap<&str, &str> = log
@@ -476,6 +480,9 @@ pub(crate) fn rows_of(
         rows.push(Row::Writing {
             text: stream.1.clone(),
         });
+    }
+    if parked {
+        rows.push(Row::Parked);
     }
     rows.extend(sent.iter().map(|p| Row::User {
         key: format!("sent-{}", p.request),

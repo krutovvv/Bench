@@ -488,6 +488,7 @@ impl ThreadView {
             }
             Row::Writing { text } => self.render_writing(&text, after_work, cx),
             Row::Fail { text, .. } => self.render_fail(&text, cx),
+            Row::Parked => self.render_parked(cx),
             Row::Changes {
                 key,
                 root,
