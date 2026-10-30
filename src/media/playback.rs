@@ -6,7 +6,29 @@ use crate::media::audio::{self, Playback};
 use gpui_kit::*;
 use std::path::PathBuf;
 
+/// The media state's two places for a clip that plays: an answer read aloud, a delivered file.
+pub(super) type ClipSlot = fn(&mut crate::media::state::MediaState) -> &mut Option<(String, Playback)>;
+
 impl BenchApp {
+    /// A clip starts in its place; the player says when it ends, and the place empties then
+    /// (unless another clip took it meanwhile).
+    pub(super) fn play_clip(&mut self, slot: ClipSlot, key: String, bytes: Vec<u8>, cx: &mut Context<Self>) {
+        let clip = Playback::start(bytes);
+        let ended = clip.ended();
+        *slot(&mut self.media) = Some((key, clip));
+        cx.spawn(async move |this, cx| {
+            let _ = ended.recv().await;
+            let _ = this.update(cx, |this, cx| {
+                let place = slot(&mut this.media);
+                if place.as_ref().is_some_and(|(_, p)| p.is_done()) {
+                    *place = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
     pub(super) fn toggle_media_audio(
         &mut self,
         key: String,
@@ -32,7 +54,7 @@ impl BenchApp {
                     Some(bytes) => {
                         this.stop_video(None, cx);
                         this.media.audio_since = web_time::Instant::now();
-                        this.media.audio = Some((key, Playback::start(bytes)));
+                        this.play_clip(|m| &mut m.audio, key, bytes, cx);
                     }
                     // A format playback cannot decode: the system player can.
                     None => cx.open_with_system(&local),

@@ -7,7 +7,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::client::rest;
-use crate::media::audio::{Playback, Recorder};
+use crate::media::audio::Recorder;
 use crate::media::pauses::{Cut, commit_pause, ends_sentence, predict, worth_a_run};
 use crate::media::state::{KEPT_RUNS, LiveDictation};
 
@@ -325,7 +325,7 @@ impl BenchApp {
             move |this, r, window, cx| {
                 this.media.speaking = None;
                 match r {
-                    Ok(bytes) => this.media.playing = Some((key, Playback::start(bytes))),
+                    Ok(bytes) => this.play_clip(|m| &mut m.playing, key, bytes, cx),
                     Err(e) => this.toast(
                         NotificationType::Error,
                         format!("Text-to-speech: {e:#}"),

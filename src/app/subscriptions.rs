@@ -59,24 +59,13 @@ impl BenchApp {
     }
 
     pub(super) fn timers(_window: &mut Window, cx: &mut Context<Self>) -> Vec<Task<()>> {
-        // Live clock + playback end detection.
+        // The live clocks: a run's meters, a clip's time.
         let ticker = cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor()
                     .timer(Duration::from_millis(500))
                     .await;
                 let alive = this.update(cx, |this, cx| {
-                    if this.media.playing.as_ref().is_some_and(|(_, p)| p.is_done()) {
-                        this.media.playing = None;
-                        cx.notify();
-                    }
-                    if this
-                        .media.audio
-                        .as_ref()
-                        .is_some_and(|(_, p)| p.is_done())
-                    {
-                        this.media.audio = None;
-                    }
                     if this.media.audio.is_some() {
                         cx.notify(); // the elapsed time
                     }

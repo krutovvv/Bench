@@ -160,15 +160,17 @@ pub fn decodable(bytes: &[u8]) -> bool {
 /// Plays one clip on a background thread; `stop()` or drop ends it.
 pub struct Playback {
     stop: Arc<AtomicBool>,
-    done: Arc<AtomicBool>,
+    ended: async_channel::Receiver<()>,
 }
 
 impl Playback {
     pub fn start(bytes: Vec<u8>) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
-        let done = Arc::new(AtomicBool::new(false));
-        let (s, d) = (stop.clone(), done.clone());
+        // Its sender goes with the thread: the channel closing is the clip's end.
+        let (end, ended) = async_channel::bounded::<()>(1);
+        let s = stop.clone();
         std::thread::spawn(move || {
+            let _end = end;
             let run = || -> Result<()> {
                 let (_stream, handle) = rodio::OutputStream::try_default()?;
                 let sink = rodio::Sink::try_new(&handle)?;
@@ -182,13 +184,17 @@ impl Playback {
             if let Err(e) = run() {
                 eprintln!("[audio] playback: {e}");
             }
-            d.store(true, Ordering::Relaxed);
         });
-        Self { stop, done }
+        Self { stop, ended }
+    }
+
+    /// Closes when the clip has ended, played out or stopped.
+    pub fn ended(&self) -> async_channel::Receiver<()> {
+        self.ended.clone()
     }
 
     pub fn is_done(&self) -> bool {
-        self.done.load(Ordering::Relaxed)
+        self.ended.is_closed()
     }
 
     pub fn stop(&self) {
