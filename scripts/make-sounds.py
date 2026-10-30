@@ -42,12 +42,10 @@ def save(name, samples, peak):
         f.writeframes((samples * 32767).astype("<i2").tobytes())
 
 
-# The mic: two quick notes up, the same two down. Short and the quietest: the mic may hear them.
+# The mic: two quick notes up, the same two down. The quietest: the mic may hear them.
 save("mic_on", notes((0, 660, 0.09, 30, 0.8), (0.055, 880, 0.11, 28, 1)), 0.09)
 save("mic_off", notes((0, 880, 0.09, 30, 0.8), (0.055, 660, 0.12, 28, 1)), 0.09)
-# A run answered: a fourth up, the second note left to ring.
-save("agent_done", notes((0, 587.33, 0.22, 16, 0.8), (0.1, 783.99, 0.42, 9, 1)), 0.16)
-# A question or an approval: the same note twice, lightly.
-save("needs_you", notes((0, 783.99, 0.16, 18, 0.8), (0.14, 783.99, 0.34, 10, 1)), 0.15)
-# A run failed: low, a third down, and no ring.
-save("agent_failed", notes((0, 329.63, 0.18, 14, 1), (0.12, 261.63, 0.3, 11, 1)), 0.18)
+# A message sent: one short note sliding up, a soft pop.
+t = np.arange(int(RATE * 0.09)) / RATE
+slide = np.sin(2 * np.pi * np.cumsum(520 + 500 * t / 0.09) / RATE)
+save("message_sent", slide * np.minimum(t / 0.004, 1) * np.minimum((0.09 - t) / 0.015, 1) * np.exp(-t * 26), 0.1)

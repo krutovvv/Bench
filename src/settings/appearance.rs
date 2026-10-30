@@ -64,7 +64,7 @@ impl BenchApp {
             .on_click(cx.listener(|_, on: &bool, _, cx| {
                 sound::set_enabled(*on);
                 // What was switched on, heard at once.
-                sound::Sound::AgentDone.play();
+                sound::Sound::MessageSent.play();
                 cx.notify();
             }))
             .into_any_element();
@@ -72,7 +72,7 @@ impl BenchApp {
             v_flex()
                 .w_full()
                 .child(row("Mode", "Light, dark, or follow macOS.", mode))
-                .child(row("Sounds", "Soft sounds for the mic, a finished run and a question.", sounds)),
+                .child(row("Sounds", "Soft sounds for the mic and a sent message.", sounds)),
         )
     }
 }

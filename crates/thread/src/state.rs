@@ -296,17 +296,6 @@ impl Thread {
         })
     }
 
-    /// Whether the last run ended with words of the agent's answer, not halfway (stopped during a
-    /// call) or failed. What a turn adds after its answer (its changes, its review, an insert) says
-    /// nothing of it.
-    pub fn answered(&self) -> bool {
-        let last = self.log.iter().rev().find(|it| {
-            !matches!(it, ThreadItem::Changes { .. } | ThreadItem::Review { .. } | ThreadItem::Insert { .. })
-        });
-        matches!(last, Some(ThreadItem::Text { text, narration, error, .. })
-            if error.is_none() && !narration.unwrap_or(false) && !text.trim().is_empty())
-    }
-
     /// What the live run waits for the person to answer.
     pub fn asks(&self) -> &[Ask] {
         &self.asks

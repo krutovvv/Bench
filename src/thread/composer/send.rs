@@ -220,6 +220,7 @@ impl ThreadView {
             self.run_bang(command, window, cx);
             return;
         }
+        crate::media::sound::Sound::MessageSent.play();
         // While the agent works, the message waits in the thread's queue (Pi's inbox) until the
         // answer is ready — with its files too: they are staged first (copied aside, uploaded
         // over SSH), then the same queue. The old refusal ("files go with the next message")

@@ -1,7 +1,8 @@
-//! Bench's few quiet sounds: the mic going on and off, a run's end, a question for the person. Named
-//! as Zed's `Sound`; the files are written by `scripts/make-sounds.py`. Bench's own choice whether
-//! they play, kept in `sounds.json` in its state folder. A bare build stays silent, as with
-//! notifications: copies run for pictures and tests beside the person's Bench.
+//! Bench's few quiet sounds: the mic going on and off, a message sent. A run's end has none: macOS
+//! says it with the notification. Named as Zed's `Sound`; the files are written by
+//! `scripts/make-sounds.py`. Bench's own choice whether they play, kept in `sounds.json` in its
+//! state folder. A bare build stays silent, as with notifications: copies run for pictures and
+//! tests beside the person's Bench.
 
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,9 +13,7 @@ use serde::{Deserialize, Serialize};
 pub enum Sound {
     MicOn,
     MicOff,
-    AgentDone,
-    NeedsYou,
-    AgentFailed,
+    MessageSent,
 }
 
 impl Sound {
@@ -22,9 +21,7 @@ impl Sound {
         match self {
             Sound::MicOn => include_bytes!("../../assets/sounds/mic_on.wav"),
             Sound::MicOff => include_bytes!("../../assets/sounds/mic_off.wav"),
-            Sound::AgentDone => include_bytes!("../../assets/sounds/agent_done.wav"),
-            Sound::NeedsYou => include_bytes!("../../assets/sounds/needs_you.wav"),
-            Sound::AgentFailed => include_bytes!("../../assets/sounds/agent_failed.wav"),
+            Sound::MessageSent => include_bytes!("../../assets/sounds/message_sent.wav"),
         }
     }
 
@@ -68,15 +65,15 @@ mod tests {
 
     #[test]
     fn every_sound_is_short_quiet_and_decodable() {
-        for sound in [Sound::MicOn, Sound::MicOff, Sound::AgentDone, Sound::NeedsYou, Sound::AgentFailed] {
+        for sound in [Sound::MicOn, Sound::MicOff, Sound::MessageSent] {
             let bytes = sound.bytes();
             assert!(super::super::audio::decodable(bytes), "{sound:?}");
             let mut wav = hound::WavReader::new(bytes).unwrap();
             let rate = wav.spec().sample_rate as f32;
             let samples: Vec<i16> = wav.samples::<i16>().map(Result::unwrap).collect();
-            assert!(samples.len() as f32 / rate < 0.6, "{sound:?} is long");
+            assert!(samples.len() as f32 / rate < 0.25, "{sound:?} is long");
             let peak = samples.iter().map(|s| s.unsigned_abs()).max().unwrap();
-            assert!(f32::from(peak) / 32768. < 0.2, "{sound:?} is loud");
+            assert!(f32::from(peak) / 32768. < 0.12, "{sound:?} is loud");
         }
     }
 }

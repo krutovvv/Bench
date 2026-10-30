@@ -1088,23 +1088,3 @@ fn work_pi_parked_is_a_row_until_it_runs_again() {
     t.apply(ThreadEvent::Parked(false));
     assert!(t.rows().is_empty());
 }
-
-#[test]
-fn a_run_answered_only_when_its_last_words_are_the_answer() {
-    let answered = |items: Vec<ThreadItem>| {
-        let mut t = Thread::default();
-        t.apply(ThreadEvent::Append(items));
-        t.answered()
-    };
-    assert!(answered(vec![user(1, "hi"), text(2, 0, "Done.")]));
-    // Stopped during a call, or with only the words before a call.
-    assert!(!answered(vec![user(1, "hi"), tool(2, 0, "c1")]));
-    assert!(!answered(vec![user(1, "hi"), narr(2, 0, "Looking."), tool(2, 1, "c1"), result(3, "c1"), narr(4, 0, "Now.")]));
-    let fail = ThreadItem::Fail { key: "3.0".into(), seq: 3, text: "no model".into() };
-    assert!(!answered(vec![user(1, "hi"), text(2, 0, "Part"), fail]));
-    let mut errored = text(2, 0, "");
-    if let ThreadItem::Text { error, .. } = &mut errored {
-        *error = Some("the model stopped".into());
-    }
-    assert!(!answered(vec![user(1, "hi"), errored]));
-}
