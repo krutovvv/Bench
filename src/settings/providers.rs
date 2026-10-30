@@ -1,6 +1,7 @@
 //! The gear's providers, for an agent (the gear's), through the agent's API: OpenAI-compatible
-//! endpoints, OpenRouter among them, one the main model. Beside them `fallback.rs`, `voice.rs`,
-//! `evaluator.rs`. A key is set on the card that uses it, never in a list of names.
+//! endpoints, OpenRouter among them, one the main model and one the fallback that answers when it
+//! fails or goes silent. Beside them `voice.rs`, `evaluator.rs`. A key is set on the card that
+//! uses it, never in a list of names.
 
 use std::collections::HashMap;
 
@@ -291,6 +292,44 @@ impl BenchApp {
         );
     }
 
+    /// The provider's model becomes the fallback; the fallback again: no fallback.
+    pub fn toggle_endpoint_fallback(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let e = &self.gear.providers.endpoints[i].server;
+        let is_it = self.gear.providers.fallback.as_ref().is_some_and(|(p, _)| *p == e.id);
+        let pick = (!is_it).then(|| (e.id.clone(), text(&e.model, cx)));
+        self.set_fallback(pick, window, cx);
+    }
+
+    /// The fallback model: one (provider, model), or none.
+    fn set_fallback(
+        &mut self,
+        pick: Option<(String, String)>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let list = match &pick {
+            Some((p, m)) => json!([{"provider": p, "model": m}]),
+            None => json!([]),
+        };
+        self.gear.providers.fallback = pick;
+        cx.notify();
+        self.rest_on(
+            self.gear.agent.clone(),
+            window,
+            cx,
+            move |conn| rest::merge_config(conn, json!({"fallback_providers": list})),
+            |this, r, window, cx| match r {
+                Ok(()) => this.load_agent_settings(window, cx),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Fallback: {e:#}"),
+                    window,
+                    cx,
+                ),
+            },
+        );
+    }
+
     /// Delete a provider: a form not saved yet just goes; a saved one goes on the second click.
     pub fn delete_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         let id = self.gear.providers.endpoints[i].server.id.clone();
@@ -324,11 +363,12 @@ impl BenchApp {
 
     /// The gear's models: a heading, a card per provider, "Add".
     pub(crate) fn render_providers(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let primary = cx.theme().primary;
+        let (primary, muted) = (cx.theme().primary, cx.theme().muted_foreground);
+        let fallback = self.gear.providers.fallback.as_ref().map(|(p, _)| p.clone());
         let mut page = vec![
             bench_ui::settings_heading(
-                // One model for every thread of this agent's projects: the main one and the
-                // fallback below.
+                // One model for every thread of this agent's projects: the main one and its
+                // fallback.
                 format!("Models · {} · its projects", Self::agent_name(&self.gear.agent)),
                 vec![],
                 cx,
@@ -348,11 +388,19 @@ impl BenchApp {
                 card_action(("ep-delete", i), if armed { "Confirm delete" } else { "Delete" }, false, move |this, w, cx| this.delete_endpoint(i, w, cx), cx),
                 card_action(("ep-check", i), "Check", false, move |this, w, cx| this.check_endpoint(i, w, cx), cx),
             ];
+            let is_fallback = saved && fallback.as_deref() == Some(e.server.id.as_str());
             if saved && !e.current {
                 actions.push(card_action(("ep-default", i), "Make main", false, move |this, w, cx| this.make_endpoint_default(i, w, cx), cx));
+                actions.push(card_action(("ep-fallback", i), if is_fallback { "No fallback" } else { "Make fallback" }, false, move |this, w, cx| this.toggle_endpoint_fallback(i, w, cx), cx));
             }
             actions.push(card_action(("ep-save", i), "Save", true, move |this, w, cx| this.save_endpoint(i, w, cx), cx));
-            let role = e.current.then(|| ("main model".into(), primary));
+            let role = if e.current {
+                Some(("main model".into(), primary))
+            } else if is_fallback {
+                Some(("fallback".into(), muted))
+            } else {
+                None
+            };
             let rows = vec![
                 input_row("Name", "How it is listed", &e.server.name, cx),
                 input_row("Address", "OpenAI-compatible, ends in /v1", &e.server.url, cx),

@@ -1,11 +1,10 @@
-//! The gear (Bench → Settings…, ⌘,): its tabs Agents (each agent's models, fallback, voice and
+//! The gear (Bench → Settings…, ⌘,): its tabs Agents (each agent's models, voice and
 //! evaluator; servers' agents added and removed), Presets and Appearance.
 
 pub(crate) mod state;
 pub(crate) mod agent_form;
 pub(crate) mod appearance;
 pub(crate) mod evaluator;
-pub(crate) mod fallback;
 pub(crate) mod new_project;
 pub(crate) mod presets;
 pub(crate) mod providers;
@@ -150,7 +149,6 @@ impl BenchApp {
         }
 
         page.extend(self.render_providers(cx));
-        page.extend(self.render_fallback(cx));
         page.extend(self.render_voice(cx));
         page.extend(self.render_evaluator(cx));
 
