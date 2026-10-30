@@ -87,6 +87,9 @@ pub fn download(
     cap: u64,
 ) -> Result<Vec<u8>> {
     use std::io::Read as _;
+    if conn.fake.is_some() {
+        return Err(anyhow!("a fake agent keeps no files"));
+    }
     let route = format!("/api/fs/download?path={}{}", enc(path), on(machine));
     let (h, v) = conn.auth();
     let resp = match ureq::get(&url(conn, &route))

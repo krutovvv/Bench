@@ -442,15 +442,6 @@ impl ThreadView {
             .update(cx, |app, cx| {
                 let project = at.project_or_host();
                 let machine = app.location(&project).files_machine();
-                if app.demo {
-                    let text = crate::demo::turn_diff(&path);
-                    me.update(cx, |v, cx| {
-                        v.thread.diffs.insert(slot, Some(text));
-                        cx.notify();
-                    })
-                    .ok();
-                    return;
-                }
                 let Some((conn, _)) = app.env_target(&project) else {
                     return;
                 };

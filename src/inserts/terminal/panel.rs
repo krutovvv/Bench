@@ -74,7 +74,7 @@ impl DockTerms {
 impl BenchApp {
     /// The project a new dock terminal takes: the Explorer's while it is shown, else the open
     /// thread's. Existing tabs keep the project they were born with.
-    fn terminal_project(&self, cx: &App) -> String {
+    pub(crate) fn terminal_project(&self, cx: &App) -> String {
         if self.left_dock.shows(Panel::Explorer) && !self.explorer.project.is_empty() {
             self.explorer.project.clone()
         } else {
@@ -107,10 +107,8 @@ impl BenchApp {
         let project = self.terminal_project(cx);
         self.inserts.dock_terms.add(&project);
         self.bottom_dock.activate(Panel::Terminal);
-        if !self.demo {
-            if let Some(t) = self.dock_active_shell(window, cx) {
-                self.inserts.terminal.tabs[t].focus.focus(window, cx);
-            }
+        if let Some(t) = self.dock_active_shell(window, cx) {
+            self.inserts.terminal.tabs[t].focus.focus(window, cx);
         }
         cx.notify();
     }
@@ -121,10 +119,8 @@ impl BenchApp {
             return;
         }
         self.inserts.dock_terms.active = i;
-        if !self.demo {
-            if let Some(t) = self.dock_active_shell(window, cx) {
-                self.inserts.terminal.tabs[t].focus.focus(window, cx);
-            }
+        if let Some(t) = self.dock_active_shell(window, cx) {
+            self.inserts.terminal.tabs[t].focus.focus(window, cx);
         }
         cx.notify();
     }
@@ -194,17 +190,14 @@ impl BenchApp {
             m if m.is_empty() => "local".to_string(),
             m => m,
         };
-        let text = if self.demo {
-            crate::demo::terminal(&machine)
-        } else {
-            let Some(t) = self.inserts.terminal.tab_of_insert(&term.key) else {
-                return;
-            };
-            let s = &self.inserts.terminal.tabs[t].session;
-            s.selection_text()
-                .filter(|t| !t.trim().is_empty())
-                .unwrap_or_else(|| s.screen_text(SENT_LINES))
+        let Some(t) = self.inserts.terminal.tab_of_insert(&term.key) else {
+            return;
         };
+        let s = &self.inserts.terminal.tabs[t].session;
+        let text = s
+            .selection_text()
+            .filter(|t| !t.trim().is_empty())
+            .unwrap_or_else(|| s.screen_text(SENT_LINES));
         if text.trim().is_empty() {
             self.toast(
                 NotificationType::Info,
@@ -270,12 +263,6 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        // The demo shows made-up terminals, two so the tabs show as they really do.
-        if self.demo && self.inserts.dock_terms.is_empty() {
-            let project = self.terminal_project(cx);
-            self.inserts.dock_terms.add(&project);
-            self.inserts.dock_terms.add(&project);
-        }
         let Some(active) = self.inserts.dock_terms.active_term().cloned() else {
             return div().into_any_element();
         };
@@ -369,28 +356,9 @@ impl BenchApp {
                 )
                 .children(actions)
         };
-        let body = if self.demo {
-            let alias = machine.clone();
-            div()
-                .size_full()
-                .px_4()
-                .py_2()
-                .bg(cx.theme().background)
-                .font_family(bench_ui::theme::MONO)
-                .text_sm()
-                .whitespace_nowrap()
-                .overflow_hidden()
-                .children(
-                    crate::demo::terminal(&alias)
-                        .lines()
-                        .map(|l| div().child(l.to_string())),
-                )
-                .into_any_element()
-        } else {
-            match self.dock_active_shell(window, cx) {
-                Some(t) => self.render_terminal(t, window, cx),
-                None => div().into_any_element(),
-            }
+        let body = match self.dock_active_shell(window, cx) {
+            Some(t) => self.render_terminal(t, window, cx),
+            None => div().into_any_element(),
         };
         v_flex()
             .size_full()

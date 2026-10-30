@@ -193,7 +193,7 @@ impl BenchApp {
                     .text_base()
                     .text_color(muted)
                     .truncate()
-                    .when(paused && !self.demo, |d| {
+                    .when(paused, |d| {
                         d.child("Paused — click the page to watch it live")
                     }),
             )

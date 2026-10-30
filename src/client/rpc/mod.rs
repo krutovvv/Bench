@@ -37,6 +37,8 @@ pub(crate) enum Outgoing {
 /// The session with one agent; dropping it closes the socket.
 pub struct Client {
     tx: mpsc::Sender<Outgoing>,
+    /// What answers instead of an agent (`client/fake.rs`): no socket, no thread.
+    fake: Option<Arc<dyn crate::client::fake::FakeAgent>>,
 }
 
 impl Drop for Client {
@@ -48,12 +50,17 @@ impl Drop for Client {
 impl Client {
     pub fn start(target: Target, incoming: async_channel::Sender<Incoming>) -> Self {
         let (tx, rx) = mpsc::channel();
+        if let Some(fake) = crate::client::fake::fake() {
+            let conn = Connection::to_fake(fake.clone());
+            let _ = incoming.try_send(Incoming::Connected(Arc::new(conn)));
+            return Self { tx, fake: Some(fake) };
+        }
         std::thread::spawn(move || {
             if let Err(err) = socket::run(&target, &rx, &incoming) {
                 let _ = incoming.try_send(Incoming::Lost(format!("{err:#}")));
             }
         });
-        Self { tx }
+        Self { tx, fake: None }
     }
 
     /// Ask the agent; the future resolves with its answer, or the error it gave.
@@ -77,6 +84,10 @@ impl Client {
 
     fn send<R: Request>(&self, request: &R) -> Result<async_channel::Receiver<Result<Value>>> {
         let (reply, answer) = async_channel::bounded(1);
+        if let Some(fake) = &self.fake {
+            let _ = reply.try_send(fake.rpc(R::METHOD, serde_json::to_value(request)?));
+            return Ok(answer);
+        }
         self.tx
             .send(Outgoing::Call {
                 method: R::METHOD,

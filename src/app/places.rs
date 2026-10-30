@@ -41,10 +41,6 @@ pub fn entry_of(agent: &str, p: &Value) -> Option<ProjectEntry> {
 impl BenchApp {
     /// Re-read `~/.ssh/config` (edited elsewhere too).
     pub fn reload_servers(&mut self, cx: &mut Context<Self>) {
-        // The demo shows made-up servers, never the person's ~/.ssh/config.
-        if self.demo {
-            return;
-        }
         self.places.ssh_servers = crate::system::sshconfig::load();
         cx.notify();
     }

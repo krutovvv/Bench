@@ -171,13 +171,19 @@ impl Session {
             .openpty(pty_size(size))
             .context("open a pseudo-terminal")?;
         let local = host == LOCAL;
-        let program = if local {
+        // A fake agent's machine: its script runs, not the person's shell or ssh.
+        let script = crate::client::fake::fake().map(|f| f.terminal_script(host));
+        let program = if script.is_some() {
+            "/bin/sh".to_string()
+        } else if local {
             std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into())
         } else {
             "/usr/bin/ssh".into()
         };
         let mut cmd = CommandBuilder::new(&program);
-        if local {
+        if let Some(script) = &script {
+            cmd.args(["-c", script]);
+        } else if local {
             // A login shell, as Terminal.app starts it (the profile sets PATH and the prompt).
             cmd.arg("-l");
         } else {

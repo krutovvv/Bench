@@ -99,12 +99,11 @@ impl ThreadView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         self.viewport_h = window.viewport_size().height;
-        if self.app(cx).is_some_and(|a| a.demo) {
-            self.demo_hooks(window, cx);
-        }
         self.sync_rows(window, cx);
         // `BENCH_TRACE_SCROLL=1`: where the thread's content stands each frame (a jerk shows).
-        if std::env::var("BENCH_TRACE_SCROLL").is_ok() {
+        static TRACE_SCROLL: std::sync::LazyLock<bool> =
+            std::sync::LazyLock::new(|| std::env::var("BENCH_TRACE_SCROLL").is_ok());
+        if *TRACE_SCROLL {
             let tv = &self.thread.tv;
             let top = tv.list.logical_scroll_top();
             let first = tv.list.bounds_for_item(top.item_ix).map(|b| b.top());

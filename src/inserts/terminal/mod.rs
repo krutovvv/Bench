@@ -140,22 +140,6 @@ impl InsertKind for Terminal {
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
         let alias = app.thread_machine(at);
-        if app.demo {
-            return Some(
-                div()
-                    .px_3()
-                    .font_family(bench_ui::theme::MONO)
-                    .text_sm()
-                    .whitespace_nowrap()
-                    .overflow_hidden()
-                    .children(
-                        crate::demo::terminal(&alias)
-                            .lines()
-                            .map(|l| div().h(px(bench_ui::TERMINAL_LINE_H)).child(l.to_string())),
-                    )
-                    .into_any_element(),
-            );
-        }
         let ix = app.insert_terminal(&ins.id, &alias, window, cx)?;
         let tab = &app.inserts.terminal.tabs[ix];
         if tab.background {

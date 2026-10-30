@@ -36,11 +36,7 @@ impl BenchApp {
         let app = cx.weak_entity();
         let view = cx.new(|cx| ThreadView::new(app, window, cx));
         // A thread seen before shows its last state now, and catches up when its journal comes.
-        let journal = if self.demo {
-            self.demo_state.threads.get(id.as_str()).cloned()
-        } else {
-            self.threads.cache.remove(id.as_str())
-        };
+        let journal = self.threads.cache.remove(id.as_str());
         let project = self.project_of_thread(&host, &id);
         view.update(cx, |v, _| {
             v.thread.host = host.clone();
@@ -52,10 +48,7 @@ impl BenchApp {
         let at = view.read(cx).thread_ref();
         self.beside_thread = Some(view);
         self.right_dock.activate(Panel::Thread);
-        // Nothing to fetch in the demo: its thread is all there.
-        if !self.demo {
-            self.fetch_thread(at, cx);
-        }
+        self.fetch_thread(at, cx);
         cx.notify();
     }
 

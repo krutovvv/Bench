@@ -105,6 +105,9 @@ pub struct Browser {
 impl Browser {
     /// Connects to the gateway; `wake` gets a message for every change the view should show.
     pub fn start(live: Option<&str>, wake: async_channel::Sender<()>) -> Result<Arc<Self>> {
+        if let Some(fake) = crate::client::fake::fake() {
+            return Ok(Self::of_fake(fake.browser_tab()));
+        }
         if cfg!(target_family = "wasm") {
             return Err(anyhow!("The server's browser is live in the desktop app"));
         }
@@ -129,6 +132,32 @@ impl Browser {
             }
         });
         Ok(b)
+    }
+
+    /// A fake agent's gateway: its one tab, its picture; nothing is listening.
+    fn of_fake(tab: crate::client::fake::FakeTab) -> Arc<Self> {
+        let shot = Shot {
+            frame: image_of(tab.jpeg),
+            url: tab.url.clone(),
+            ..Default::default()
+        };
+        let state = State {
+            pages: vec![Page {
+                id: tab.id.clone(),
+                url: tab.url,
+                title: tab.title,
+                asleep: false,
+            }],
+            shots: [(tab.id, shot)].into_iter().collect(),
+            ready: true,
+            ..Default::default()
+        };
+        Arc::new(Self {
+            url: String::new(),
+            state: Arc::new(Mutex::new(state)),
+            out: mpsc::channel().0,
+            paused: std::sync::atomic::AtomicBool::new(false),
+        })
     }
 
     fn run(

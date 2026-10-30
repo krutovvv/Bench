@@ -23,9 +23,6 @@ pub struct Browser;
 /// The thread's tab, when open: (id, url, title).
 fn tab_of(app: &BenchApp, ins: &Insert) -> Option<(String, String, String)> {
     let tab = ins.get("tab");
-    if app.demo {
-        return (!tab.is_empty()).then(|| (tab, ins.get("url"), "New post".into()));
-    }
     let b = app.inserts.browser.conn.as_ref()?;
     let st = b.state.lock().unwrap();
     let page = st.pages.iter().find(|p| p.id == tab)?;
@@ -114,9 +111,7 @@ impl InsertKind for Browser {
                     .into_any_element(),
             );
         }
-        if !app.demo {
-            app.ensure_browser(at, cx);
-        }
+        app.ensure_browser(at, cx);
         if let Some((tab, _, _)) = tab_of(app, ins) {
             return Some(app.render_tab(at, tab, cx));
         }
@@ -125,7 +120,7 @@ impl InsertKind for Browser {
             .conn
             .as_ref()
             .is_some_and(|b| b.state.lock().unwrap().ready);
-        if !ready && !app.demo {
+        if !ready {
             return Some(
                 ShimmerText::new("Connecting to the browser…")
                     .text_base()
@@ -181,9 +176,7 @@ impl InsertKind for Browser {
         }
         if url.is_empty() {
             // Put in: its tab opens at once.
-            if !app.demo {
-                app.reopen_thread_tab(at, cx);
-            }
+            app.reopen_thread_tab(at, cx);
             return Some(
                 ShimmerText::new("Opening this thread's tab…")
                     .text_base()

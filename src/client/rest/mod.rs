@@ -33,6 +33,9 @@ pub fn with_settings(path: &str, settings: &str) -> String {
 
 /// A GET answered with JSON.
 pub fn get(conn: &Connection, path: &str) -> Result<Value> {
+    if let Some(fake) = &conn.fake {
+        return fake.rest("GET", path, Value::Null);
+    }
     let (h, v) = conn.auth();
     let resp = ureq::get(&url(conn, path))
         .set(h, &v)
@@ -85,6 +88,9 @@ fn send(
     body: Value,
     timeout: u64,
 ) -> Result<Value> {
+    if let Some(fake) = &conn.fake {
+        return fake.rest(method, path, body);
+    }
     let (h, v) = conn.auth();
     let resp = ureq::request(method, &url(conn, path))
         .set(h, &v)

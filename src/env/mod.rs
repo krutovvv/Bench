@@ -212,10 +212,6 @@ impl BenchApp {
             let env = self.new_env(id, window, cx);
             self.envs.insert(id.to_string(), env);
         }
-        if self.demo {
-            crate::demo::env(self, id, window, cx);
-            return;
-        }
         let Some((conn, eid)) = self.env_target(id) else {
             return;
         };

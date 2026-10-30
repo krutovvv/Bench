@@ -373,7 +373,7 @@ impl ThreadView {
             .items_center()
             .gap_1()
             .when(
-                in_list && !(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
+                in_list && !(rec || trans) && !self.tools_shown,
                 |d| d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.)),
             )
             .when(in_list, |d| d.children(attach.take()).children(mic.take()));

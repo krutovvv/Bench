@@ -108,9 +108,9 @@ fn path_of(uri: &lsp_types::Uri) -> String {
 
 impl BenchApp {
     /// Give a file's editor its project's servers: the hover, the definition (another file opens
-    /// as a tab of the same project and machine). None in the demo: it has no agent.
+    /// as a tab of the same project and machine).
     pub(crate) fn attach_servers(&mut self, f: &FileRef, cx: &mut Context<Self>) {
-        let Some((conn, project)) = self.env_target(&f.project).filter(|_| !self.demo) else {
+        let Some((conn, project)) = self.env_target(&f.project) else {
             return;
         };
         let Some(d) = self.explorer.docs.get(&DocKey::File(f.clone())) else {
@@ -164,11 +164,6 @@ impl BenchApp {
         else {
             return;
         };
-        if self.demo {
-            let problems = crate::demo::file_problems(&f.path);
-            editor.update(cx, |s, cx| underline(s, problems, cx));
-            return;
-        }
         let Some((conn, project)) = self.env_target(&f.project) else {
             return;
         };

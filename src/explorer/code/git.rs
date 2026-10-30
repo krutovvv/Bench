@@ -140,13 +140,6 @@ pub(super) fn diff_pane(
 impl BenchApp {
     /// HEAD's text of an open file, read once it is open; then its changes are marked.
     pub(crate) fn read_head(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
-        if self.demo {
-            if let Some(d) = self.explorer.docs.get_mut(&DocKey::File(f.clone())) {
-                d.head = crate::demo::file_head(&f.path);
-            }
-            self.mark_changes(f, window, cx);
-            return;
-        }
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };

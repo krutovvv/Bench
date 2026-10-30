@@ -51,11 +51,7 @@ impl BenchApp {
         }
         self.reset_chat(cx);
         // A thread seen before shows its last state now, and catches up when its journal comes.
-        let journal = if self.demo {
-            self.demo_state.threads.get(id.as_str()).cloned()
-        } else {
-            self.threads.cache.remove(id.as_str())
-        };
+        let journal = self.threads.cache.remove(id.as_str());
         let project = self.project_of_thread(&host, &id);
         self.active_thread.update(cx, |v, cx| {
             v.thread.host = host.clone();
@@ -64,10 +60,6 @@ impl BenchApp {
             v.thread.project = project;
             cx.notify();
         });
-        if self.demo {
-            cx.notify();
-            return;
-        }
         self.save_place(cx);
         let at = self.thread_ref(cx);
         self.fetch_thread(at, cx);

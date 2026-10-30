@@ -64,9 +64,8 @@ pub struct ThreadView {
     /// Where the left button went down on the thread itself, and what had the focus then; a click
     /// that handled itself stopped before this.
     pub(crate) press: Option<(Point<Pixels>, Option<FocusHandle>)>,
-    /// `BENCH_DEMO_DRAFT` was put into the composer; `BENCH_DEMO_SCROLL` was done.
-    pub(crate) demo_draft_done: bool,
-    pub(crate) demo_scrolled: bool,
+    /// The tools that show on hover show at rest (a picture of them).
+    pub(crate) tools_shown: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -140,8 +139,7 @@ impl ThreadView {
             composer_fresh: false,
             reveal_tail: None,
             press: None,
-            demo_draft_done: false,
-            demo_scrolled: false,
+            tools_shown: false,
             _subscriptions: subscriptions,
         }
     }

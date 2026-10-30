@@ -1,16 +1,12 @@
-//! The blog project's environment and files, for its Settings and the Explorer (any project the
-//! demo shows reads as the blog).
+//! What the demo's agent says of the blog project and its files, as its REST answers carry it (any
+//! project the demo shows reads as the blog): its environment, its folders, files and their last
+//! commit, its specs, its language server, the presets, the gear's models.
 
-use gpui_kit::*;
+use serde_json::{Value, json};
 
-use crate::app::BenchApp;
-
-/// shows reads as the blog).
-pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<BenchApp>) {
-    let Some(e) = app.envs.get_mut(id) else {
-        return;
-    };
-    let v = serde_json::json!({
+/// `/api/projects/<id>/env`.
+pub(super) fn env() -> Value {
+    json!({
         "dir": "~/.bench/projects/p-blog",
         "cwd": "/Users/demo/code/blog",
         "project": {"name": "Northwind blog", "folder": "/Users/demo/code/blog"},
@@ -54,207 +50,37 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
             {"id": "c-digest", "name": "Weekly digest", "prompt": "Draft the weekly digest from this week's posts and comments; save it as a draft.", "schedule": {"expr": "0 9 * * 1"}, "schedule_display": "0 9 * * 1", "enabled": true, "next_run_at": "2026-10-26T09:00:00+03:00", "last_run_at": "2026-10-19T09:00:00+03:00", "last_status": "ok", "last_output": "The digest draft is saved: 4 posts, 2 top comments."},
             {"id": "c-links", "name": "Broken links", "prompt": "Check every post's links; list the broken ones with the post.", "schedule": {"expr": "every 1d"}, "schedule_display": "every 1d", "enabled": false, "next_run_at": null, "last_status": null}
         ]
-    });
-    crate::env::apply(e, &v, window, cx);
-    // The presets the gear would have read from the agent (there is none in a demo copy).
-    if app.gear.presets.lsp.is_empty() {
-        app.gear.presets.lsp = vec![
-            (
-                "typescript".into(),
-                "typescript-language-server".into(),
-                serde_json::json!({"extensions": ["ts", "tsx", "js", "jsx"]}),
-            ),
-            (
-                "pyright".into(),
-                "pyright".into(),
-                serde_json::json!({"extensions": ["py"]}),
-            ),
-            (
-                "basedpyright".into(),
-                "basedpyright".into(),
-                serde_json::json!({"extensions": ["py"]}),
-            ),
-            (
-                "rust-analyzer".into(),
-                "rust-analyzer".into(),
-                serde_json::json!({"extensions": ["rs"]}),
-            ),
-            (
-                "php".into(),
-                "intelephense".into(),
-                serde_json::json!({"extensions": ["php", "inc"]}),
-            ),
-        ];
-    }
-    // `BENCH_ENV=telegram`: the page scrolls to the Telegram block a beat after opening;
-    // `BENCH_ENV=model` to the Model block.
-    let to = std::env::var("BENCH_ENV").ok();
-    if matches!(to.as_deref(), Some("telegram") | Some("model")) {
-        let scroll = app.explorer.settings_scroll.clone();
-        let model = to.as_deref() == Some("model");
-        cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(std::time::Duration::from_millis(900))
-                .await;
-            if model {
-                scroll.set_offset(point(px(0.), px(-620.)));
-            } else {
-                scroll.scroll_to_bottom();
-            }
-            let _ = this.update(cx, |_app, cx| cx.notify());
-        })
-        .detach();
-    }
-    // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
-    // `BENCH_EXPLORER=comment` a review comment being written, `=specs` the specs and one read, `=settings` its settings, `=part` an MCP server, `=lsp` a language
-    // server that failed, `=lsp-new` the "Add a server" card with its preset chips, `=thread` the
-    // thread beside it
-    // with lines sent to it. `BENCH_DEMO=env` is `explorer` with its settings open.
-    let mode = std::env::var("BENCH_DEMO").unwrap_or_default();
-    if !matches!(mode.as_str(), "explorer" | "env") || !app.explorer.tabs.is_empty() {
-        return;
-    }
-    let dir = "~/.bench/projects/p-blog".to_string();
-    let root = crate::explorer::FileRef {
-        project: "p-blog".into(),
-        machine: None,
-        path: "/Users/demo/code/blog".into(),
-    };
-    let skill = app.agent_file(format!("{dir}/skills/release-notes"));
-    for f in [
-        root.clone(),
-        root.join("content"),
-        root.join("content/posts"),
-        skill.clone(),
-    ] {
-        app.explorer.open.insert(format!("d:{}", f.listing_key()));
-        app.list_folder(f, window, cx);
-    }
-    app.explorer.open.extend(
-        [
-            "files",
-            "instructions",
-            "skills",
-            "g:Tools",
-            "s:mcp",
-            "g:Schedule",
-            "s:cron",
-        ]
-        .map(String::from),
-    );
-    let post = crate::explorer::DocKey::File(root.join("content/posts/release-2-4.md"));
-    app.open_doc(
-        crate::explorer::DocKey::File(app.agent_file(format!("{dir}/SYSTEM.md"))),
-        window,
-        cx,
-    );
-    app.open_doc(post, window, cx);
-    let explorer = if mode == "env" {
-        "settings".to_string()
-    } else {
-        std::env::var("BENCH_EXPLORER").unwrap_or_default()
-    };
-    match explorer.as_str() {
-        "settings" => app.open_doc(
-            crate::explorer::DocKey::Settings {
-                project: "p-blog".into(),
-            },
-            window,
-            cx,
-        ),
-        "part" => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
-        "lsp" | "lsp-new" => {
-            let name = if explorer == "lsp-new" {
-                "new"
-            } else {
-                "pyright"
-            };
-            app.open_part("p-blog".into(), "lsp", name.into(), window, cx)
-        }
-        // The release post's changes since the last commit, beside it.
-        "diff" => {
-            let post = root.join("content/posts/release-2-4.md");
-            app.open_diff(post, window, cx);
-        }
-        // The project's terminal under the post, its lines sent to the thread beside.
-        "terminal" => {
-            app.show_demo_thread("d-site", cx);
-            app.bottom_dock.activate(crate::workspace::Panel::Terminal);
-            app.send_terminal_to_thread(window, cx);
-        }
-        // The project's Problems, sent to the thread beside.
-        "problems" => {
-            app.show_demo_thread("d-site", cx);
-            app.open_problems(window, cx);
-            app.send_problems_to_thread("p-blog", window, cx);
-        }
-        // The thread beside the post, lines of it sent to the composer (⌘L).
-        "thread" => {
-            app.show_demo_thread("d-site", cx);
-            app.right_dock.activate(crate::workspace::Panel::Thread);
-            app.add_reference(
-                crate::thread::composer::attachments::Reference::Code(crate::thread::composer::attachments::CodeRef {
-                    path: "/Users/demo/code/blog/content/posts/release-2-4.md".into(),
-                    lines: Some((11, 15)),
-                    text: Some("## What changed".into()),
-                }),
-                cx,
-            );
-        }
-        // The specs: the group open, the posts' spec read in its tab, the thread beside.
-        "specs" => {
-            app.explorer.open.extend(["specs".to_string(), "spec:blog".to_string()]);
-            app.explorer.specs.insert(app.explorer.project.clone(), Some(specs()));
-            let s = specs().specs[1].clone();
-            let key = app.spec_key(&s);
-            app.open_doc(key, window, cx);
-        }
-        // Review comments: one already in the composer, the next being written under the post.
-        "comment" => {
-            use crate::thread::composer::attachments::{CodeRef, CommentRef, Reference};
-            app.show_demo_thread("d-site", cx);
-            app.right_dock.activate(crate::workspace::Panel::Thread);
-            app.add_reference(
-                Reference::Comment(CommentRef {
-                    id: "c3f1".into(),
-                    code: CodeRef {
-                        path: "/Users/demo/code/blog/content/posts/release-2-4.md".into(),
-                        lines: Some((3, 3)),
-                        text: Some("date: 2026-10-20".into()),
-                    },
-                    note: "The release is on the 28th".into(),
-                }),
-                cx,
-            );
-            app.start_comment(window, cx);
-            if let Some(c) = app.explorer.comment.as_mut() {
-                c.code.lines = Some((11, 15));
-                c.input.update(cx, |s, cx| {
-                    s.set_value("Shorter: one line per change, no marketing words", window, cx)
-                });
-            }
-        }
-        _ => {}
-    }
+    })
 }
 
-/// The demo's folders, as the agent would list them: (name, is a folder).
-/// What git ignores in the demo blog: the tree dims these rows, as it does for a real
-/// repository (`/api/git/ignored` reads the real ones).
-pub fn ignored(path: &str) -> Vec<String> {
+/// `/api/presets`: the language servers a project takes with one click.
+pub(super) fn presets() -> Value {
+    let lsp = |title: &str, exts: &[&str]| json!({"title": title, "spec": {"extensions": exts}});
+    json!({
+        "mcp": {},
+        "lsp": {
+            "typescript": lsp("typescript-language-server", &["ts", "tsx", "js", "jsx"]),
+            "pyright": lsp("pyright", &["py"]),
+            "basedpyright": lsp("basedpyright", &["py"]),
+            "rust-analyzer": lsp("rust-analyzer", &["rs"]),
+            "php": lsp("intelephense", &["php", "inc"])
+        }
+    })
+}
+
+/// `/api/git/ignored`: what git ignores in the blog, the tree dims these rows.
+pub(super) fn ignored(path: &str) -> Value {
     match path.trim_end_matches('/') {
-        "/Users/demo/code/blog" => [
-            "/Users/demo/code/blog/node_modules",
-            "/Users/demo/code/blog/dist",
-            "/Users/demo/code/blog/package-lock.json",
-        ]
-        .map(str::to_string)
-        .to_vec(),
-        _ => vec![],
+        "/Users/demo/code/blog" => json!({
+            "root": "/Users/demo/code/blog",
+            "ignored": ["node_modules/", "dist/", "package-lock.json"]
+        }),
+        _ => json!({"root": "", "ignored": []}),
     }
 }
 
-pub fn listing(path: &str) -> Vec<(String, String, bool)> {
+/// `/api/fs/list`.
+pub(super) fn listing(path: &str) -> Value {
     let names: &[(&str, bool)] = match path.trim_end_matches('/') {
         "/Users/demo/code/blog" => &[
             ("content", true),
@@ -281,20 +107,15 @@ pub fn listing(path: &str) -> Vec<(String, String, bool)> {
         p if p.ends_with("references") => &[("style.md", false)],
         _ => &[],
     };
-    names
+    let entries: Vec<Value> = names
         .iter()
-        .map(|(n, d)| {
-            (
-                n.to_string(),
-                format!("{}/{n}", path.trim_end_matches('/')),
-                *d,
-            )
-        })
-        .collect()
+        .map(|(n, d)| json!({"name": n, "path": format!("{}/{n}", path.trim_end_matches('/')), "isDirectory": d}))
+        .collect();
+    json!({"entries": entries})
 }
 
 /// A demo file's text.
-pub fn file_text(path: &str) -> String {
+pub(super) fn file_text(path: &str) -> String {
     let name = path.rsplit('/').next().unwrap_or(path);
     match name {
         "SYSTEM.md" => "# Northwind blog\n\nProduct news and guides for our customers, published on Ghost.\n\nWrite plainly, for people who use the product, not for engineers. Every post gets a cover and two tags; drafts first, publish only when asked.\n".into(),
@@ -305,27 +126,28 @@ pub fn file_text(path: &str) -> String {
     }
 }
 
-/// The blog's specs, as the agent lists them (`explorer/specs/`).
-pub fn specs() -> crate::explorer::specs::Specs {
-    use crate::explorer::specs::{Spec, Specs};
+/// `/api/specs`: the blog's specs.
+pub(super) fn specs() -> Value {
     let root = "/Users/demo/code/blog";
-    let spec = |id: &str, title: &str, parent: Option<&str>, refs: &[&str], dir: &str, draft: bool| Spec {
-        id: id.into(),
-        title: title.into(),
-        status: Some(if draft { "draft" } else { "active" }.into()),
-        parent: parent.map(Into::into),
-        references: refs.iter().map(|r| r.to_string()).collect(),
-        path: format!("{root}/{dir}SPEC.md"),
+    let spec = |id: &str, title: &str, parent: Option<&str>, refs: &[&str], dir: &str, draft: bool| {
+        json!({
+            "id": id,
+            "title": title,
+            "status": if draft { "draft" } else { "active" },
+            "parent": parent,
+            "references": refs,
+            "path": format!("{root}/{dir}SPEC.md"),
+        })
     };
-    Specs {
-        root: root.into(),
-        specs: vec![
+    json!({
+        "root": root,
+        "specs": [
             spec("blog", "Northwind blog — product news for customers", None, &[], "", false),
             spec("posts", "content/posts — one release, one post", Some("blog"), &["theme"], "content/posts/", false),
             spec("pages", "content/pages — the pages that stay", Some("blog"), &[], "content/pages/", true),
             spec("theme", "theme — the Ghost theme and its covers", Some("blog"), &[], "theme/", false),
         ],
-    }
+    })
 }
 
 fn spec_text(path: &str) -> String {
@@ -335,9 +157,9 @@ fn spec_text(path: &str) -> String {
     "---\nid: blog\ntype: goal-and-requirements\ntitle: Northwind blog\n---\n\n# Northwind blog\n\nProduct news and guides for our customers.\n".into()
 }
 
-/// A file's text at the last commit (`explorer/git.rs`): the release post had another title, no
+/// A file's text at the last commit (`/api/git/head`): the release post had another title, no
 /// line on the search box, and one more sentence.
-pub fn file_head(path: &str) -> Option<String> {
+pub(super) fn file_head(path: &str) -> Option<String> {
     let now = file_text(path);
     match path.rsplit('/').next().unwrap_or(path) {
         "release-2-4.md" => Some(
@@ -352,29 +174,41 @@ pub fn file_head(path: &str) -> Option<String> {
     }
 }
 
-/// What the blog's language server says of a file the demo opens (`explorer/lsp.rs`): the
-/// release post's cover is missing, its link to a draft is broken.
-pub fn file_problems(path: &str) -> Vec<lsp_types::Diagnostic> {
-    let at = |line, from, to| lsp_types::Range {
-        start: lsp_types::Position::new(line, from),
-        end: lsp_types::Position::new(line, to),
-    };
+/// What the blog's language server says of a file (`/api/lsp/diagnostics`): the release post's
+/// cover is missing.
+pub(super) fn file_problems(path: &str) -> Value {
     match path.rsplit('/').next().unwrap_or(path) {
-        "release-2-4.md" => vec![lsp_types::Diagnostic {
-            range: at(3, 7, 28),
-            severity: Some(lsp_types::DiagnosticSeverity::WARNING),
-            source: Some("marksman".into()),
-            message: "File does not exist: /images/2-4-cover.png".into(),
-            ..Default::default()
-        }],
-        _ => vec![],
+        "release-2-4.md" => json!([{
+            "range": {"start": {"line": 3, "character": 7}, "end": {"line": 3, "character": 28}},
+            "severity": 2,
+            "source": "marksman",
+            "message": "File does not exist: /images/2-4-cover.png",
+        }]),
+        _ => json!([]),
     }
 }
 
-/// The gear's Agents tab for this Mac's agent: an endpoint, the fallback, voice and the evaluator
-/// (`BENCH_PANEL=providers`), as `load_providers` reads them from an agent.
-pub fn providers() -> (serde_json::Value, serde_json::Value, serde_json::Value) {
-    let endpoints = serde_json::json!({"endpoints": [
+/// `/api/git/show`: the landing's and the signup form's two sides of the turn.
+pub(super) fn turn_file(tree: &str, path: &str) -> Option<String> {
+    let after = tree == "demo-head";
+    match path.rsplit('/').next().unwrap_or(path) {
+        "landing.tsx" => Some(if after {
+            "export default function Landing() {\n  return (\n    <Page>\n      <Hero title=\"Ship faster\" />\n      <Quotes />\n      <Features />\n      <Pricing />\n    </Page>\n  );\n}\n".into()
+        } else {
+            "export default function Landing() {\n  return (\n    <Page>\n      <Hero title={long} subtitle={sub} />\n      <Features />\n      <Quotes />\n      <Pricing />\n    </Page>\n  );\n}\n".into()
+        }),
+        "SignupForm.tsx" => Some(if after {
+            "<Form>\n  <Field name=\"email\" />\n  <Field name=\"name\" />\n  <Submit>Start free</Submit>\n</Form>\n".into()
+        } else {
+            "<Form>\n  <Field name=\"email\" />\n  <Field name=\"name\" />\n  <Field name=\"companySize\" />\n  <Field name=\"phone\" />\n  <Submit>Start free</Submit>\n</Form>\n".into()
+        }),
+        _ => None,
+    }
+}
+
+/// The endpoints the gear lists (`/api/providers/custom-endpoints`).
+pub(super) fn endpoints() -> Value {
+    json!({"endpoints": [
         {
             "id": "dev", "name": "dev", "base_url": "http://192.168.1.100:10137/v1",
             "model": "Qwen3.8-Next-Flash", "context_length": 131072, "is_current": true
@@ -383,20 +217,37 @@ pub fn providers() -> (serde_json::Value, serde_json::Value, serde_json::Value) 
             "id": "openrouter", "name": "OpenRouter", "base_url": "https://openrouter.ai/api/v1",
             "model": "qwen/qwen3.8-flash", "context_length": 131072
         }
-    ]});
-    let yaml = serde_json::json!({
-        "model": {"provider": "dev", "default": "Qwen3.8-Next-Flash"},
+    ]})
+}
+
+/// The evaluator's servers (`/api/judge`).
+pub(super) fn judge() -> Value {
+    json!({
+        "servers": [
+            {"id": "local-jev", "name": "Local Jev", "base_url": "http://192.168.1.100:10292", "model": "h2o-lightning-4b", "api_key": "sk-none"},
+            {"id": "openrouter", "name": "OpenRouter", "base_url": "https://openrouter.ai/api", "model": "typesafe/jev-1.13", "api_key": "sk-or-demo"}
+        ],
+        "main": "local-jev",
+        "fallback": "openrouter"
+    })
+}
+
+/// `/api/config/raw`: the agent's settings as its config says them. `model`: the main one, if any.
+pub(super) fn config(model: bool) -> Value {
+    let mut main = json!({"provider": "dev", "context_length": 131072});
+    if model {
+        main["default"] = json!("Qwen3.8-Next-Flash");
+    }
+    let yaml = json!({
+        "model": main,
+        "approvals": {"mode": "smart"},
+        "providers": {
+            "dev": {"name": "dev", "base_url": "http://192.168.1.100:10137/v1", "model": "Qwen3.8-Next-Flash"},
+            "openrouter": {"name": "OpenRouter", "base_url": "https://openrouter.ai/api/v1", "model": "qwen/qwen3.8-flash"}
+        },
         "fallback_providers": [{"provider": "openrouter", "model": "qwen/qwen3.8-flash"}],
         "stt": {"provider": "openai", "openai": {"base_url": "http://192.168.1.100:10240/v1", "model": "whisper-1", "language": "ru"}},
         "tts": {"provider": "openai", "openai": {"base_url": "http://192.168.1.100:10240/v1", "model": "tts-1", "voice": "alloy"}},
-        "judge": {
-            "servers": [
-                {"id": "local-jev", "name": "Local Jev", "base_url": "http://192.168.1.100:10292", "model": "h2o-lightning-4b", "api_key": "sk-none"},
-                {"id": "openrouter", "name": "OpenRouter", "base_url": "https://openrouter.ai/api", "model": "typesafe/jev-1.13", "api_key": "sk-or-demo"}
-            ],
-            "main": "local-jev",
-            "fallback": "openrouter"
-        }
     });
-    (endpoints, serde_json::json!({}), yaml)
+    json!({"yaml": serde_yaml::to_string(&yaml).unwrap_or_default()})
 }

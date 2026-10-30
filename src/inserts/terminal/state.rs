@@ -56,10 +56,6 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<usize> {
-        // The desktop demo never opens a real shell or ssh (the browser one shows a note).
-        if self.demo && cfg!(not(target_family = "wasm")) {
-            return None;
-        }
         let (tx, rx) = async_channel::bounded::<()>(1);
         let palette = crate::inserts::terminal::view::palette(cx.theme());
         match Session::spawn(alias, palette, tx) {

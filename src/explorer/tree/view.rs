@@ -48,11 +48,6 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
-        // The demo opens on the blog (`demo::load`), read here once.
-        if self.demo && !self.envs.contains_key(&self.explorer.project) {
-            let id = self.explorer.project.clone();
-            self.load_env(&id, window, cx);
-        }
         let mut out: Vec<AnyElement> = vec![];
         if self.explorer.threads {
             out.extend(self.explorer_threads(cx));

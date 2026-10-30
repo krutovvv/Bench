@@ -28,13 +28,7 @@ use crate::client::connection;
 
 #[cfg(not(target_family = "wasm"))]
 fn main() {
-    // The demo keeps its state in a folder of its own: the person's stays as it was.
-    if std::env::var("BENCH_DEMO").is_ok() {
-        let look = settings::appearance::load();
-        connection::use_state_dir(std::env::temp_dir().join(format!("bench-demo-{}", std::process::id())));
-        // Its look is the person's (reading it changes nothing of theirs).
-        settings::appearance::save(&look);
-    } else {
+    if !demo::install() {
         connection::migrate_state();
     }
     let args: Vec<String> = std::env::args().collect();
@@ -63,6 +57,7 @@ fn main() {
 #[cfg(target_family = "wasm")]
 fn main() {
     console_error_panic_hook::set_once();
+    demo::install();
     gpui_kit::application()
         .with_assets(gpui_kit::assets::Assets::new("."))
         .run(|cx| {
@@ -144,6 +139,7 @@ pub fn open_main_window(cx: &mut App) {
         });
         // The interceptor lives as long as the app.
         app.update(cx, |this, _| this._slash_keys = Some(keystrokes));
+        demo::attach(&app, window, cx);
         app
     }) {
         eprintln!("open window: {e:#}");

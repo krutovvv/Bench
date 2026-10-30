@@ -67,10 +67,6 @@ impl BenchApp {
             return;
         }
         self.explorer.specs.insert(project.clone(), None);
-        if self.demo {
-            self.explorer.specs.insert(project, Some(crate::demo::specs()));
-            return;
-        }
         let (Some(root), Some((conn, _))) = (self.explorer_root(), self.env_target(&project)) else {
             return;
         };

@@ -69,11 +69,6 @@ impl BenchApp {
     }
 
     pub(crate) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.demo {
-            let (endpoints, env, yaml) = crate::demo::providers();
-            self.fill_providers(endpoints, env, yaml, window, cx);
-            return;
-        }
         self.rest_on(
             self.gear.agent.clone(),
             window,

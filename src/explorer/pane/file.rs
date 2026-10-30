@@ -83,21 +83,6 @@ impl BenchApp {
 
     /// Read the file into its editor (again: what was typed is dropped).
     pub fn read_doc(&mut self, f: FileRef, window: &mut Window, cx: &mut Context<Self>) {
-        if self.demo {
-            if let Some(d) = self.explorer.docs.get_mut(&DocKey::File(f.clone())) {
-                let text = crate::demo::file_text(&f.path);
-                let language = crate::explorer::code::lang::language_for_text(&f.path, &text);
-                d.editor.update(cx, |s, cx| {
-                    s.set_highlighter(language, cx);
-                    s.set_value(text.clone(), window, cx)
-                });
-                d.saved = text;
-                d.loading = false;
-            }
-            self.check_doc(&f, Default::default(), window, cx);
-            self.read_head(&f, window, cx);
-            return;
-        }
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };

@@ -30,10 +30,6 @@ impl Item for SpecItem {
             return true;
         }
         app.explorer.spec_texts.insert(f.path.clone(), None);
-        if app.demo {
-            app.explorer.spec_texts.insert(f.path.clone(), Some(crate::demo::file_text(&f.path)));
-            return true;
-        }
         let Some((conn, _)) = app.env_target(&f.project) else {
             return true;
         };

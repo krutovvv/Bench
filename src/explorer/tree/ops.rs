@@ -168,25 +168,6 @@ impl BenchApp {
     /// Read a folder's entries: folders first, then by name.
     pub fn list_folder(&mut self, f: FileRef, window: &mut Window, cx: &mut Context<Self>) {
         self.ensure_ignored(&f, window, cx);
-        if self.demo {
-            let entries = crate::demo::listing(&f.path)
-                .into_iter()
-                .map(|(name, path, dir)| Entry { name, path, dir })
-                .collect();
-            self.explorer.listings.insert(f.listing_key(), entries);
-            let demo_ignored = crate::demo::ignored(&f.path);
-            if !demo_ignored.is_empty() {
-                let root = f.path.clone();
-                match self.explorer.ignored.iter_mut().find(|(r, _)| *r == root) {
-                    Some((_, set)) => set.extend(demo_ignored),
-                    None => self
-                        .explorer
-                        .ignored
-                        .push((root, demo_ignored.into_iter().collect())),
-                }
-            }
-            return;
-        }
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
@@ -226,7 +207,7 @@ impl BenchApp {
     /// Ask the agent what git ignores around this folder, once per folder: the tree dims those
     /// paths. Not a repository is an answer too (an empty list), so it is not asked twice.
     fn ensure_ignored(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
-        if self.demo || !self.explorer.ignored_asked.insert(f.listing_key()) {
+        if !self.explorer.ignored_asked.insert(f.listing_key()) {
             return;
         }
         let Some((conn, _)) = self.env_target(&f.project) else {

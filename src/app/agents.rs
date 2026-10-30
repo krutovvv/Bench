@@ -32,7 +32,7 @@ impl BenchApp {
     /// Connect to the agent under `host` ("" = this Mac's), once: its session starts, and what it
     /// says comes to `on_agent`.
     pub fn connect_agent(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.agents.contains_key(&host) || self.demo {
+        if self.agents.contains_key(&host) {
             return;
         }
         let target = if host.is_empty() {

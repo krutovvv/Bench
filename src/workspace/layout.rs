@@ -53,55 +53,15 @@ fn file_layer(cx: &mut Context<BenchApp>) -> Div {
         }))
 }
 
-impl BenchApp {
-    /// The demo's hooks on the window (`BENCH_DEMO=new-project`, `BENCH_DEMO_RENAME`,
-    /// `BENCH_DEMO_SEARCH`), once.
-    fn demo_hooks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.demo_state.new_project_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
-            self.demo_state.new_project_opened = true;
-            self.new_project_form(window, cx);
-        }
-        // `BENCH_DEMO_BESIDE=<thread id>`: that thread beside the open one.
-        static BESIDE: std::sync::Once = std::sync::Once::new();
-        if let Ok(id) = std::env::var("BENCH_DEMO_BESIDE") {
-            BESIDE.call_once(|| self.open_beside(id.into(), window, cx));
-        }
-        // `BENCH_DEMO_SEARCH=1|<words>`: ⌘K open, with those words typed.
-        static SEARCH: std::sync::Once = std::sync::Once::new();
-        if let Ok(q) = std::env::var("BENCH_DEMO_SEARCH") {
-            SEARCH.call_once(|| {
-                self.open_search(window, cx);
-                if q != "1" {
-                    self.sidebar.search.update(cx, |s, cx| s.set_value(q.clone(), window, cx));
-                    self.search_threads(q, window, cx);
-                }
-            });
-        }
-        // `BENCH_DEMO_RENAME=<thread id>`: that thread being renamed.
-        static RENAME: std::sync::Once = std::sync::Once::new();
-        if let Ok(id) = std::env::var("BENCH_DEMO_RENAME") {
-            RENAME.call_once(|| {
-                self.start_rename(crate::sidebar::items::Item::Thread(id.into()), window, cx)
-            });
-        }
-    }
-}
-
 impl Render for BenchApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // The prompts offered with `@` follow the open thread's project.
         let project = self.thread(cx).project.clone();
-        if !self.demo
-            && self.local_conn().is_some()
+        if self.local_conn().is_some()
             && self.threads.prompts_for.as_deref() != Some(project.as_str())
         {
             self.threads.prompts_for = Some(project);
             self.load_prompts(window, cx);
-        }
-        if self.demo {
-            self.demo_hooks(window, cx);
-            self.drop_probe(window, cx);
-            self.click_probe(window, cx);
         }
         // The server browser's stream follows what is on screen (no frames for a hidden thread).
         #[cfg(not(target_family = "wasm"))]

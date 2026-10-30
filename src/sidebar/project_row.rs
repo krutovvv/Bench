@@ -114,7 +114,7 @@ impl BenchApp {
             .has_active_drag()
             .then(|| self.drop_edge_over(&id))
             .flatten()
-            .or_else(|| crate::demo::drop_hint(g));
+            .or_else(|| self.sidebar.held_drop.filter(|(at, _)| *at == g).map(|(_, edge)| edge));
         let mut parts: Vec<AnyElement> = vec![self.render_group_head(head, cx)];
         if !collapsed {
             if let Some(note) = note {

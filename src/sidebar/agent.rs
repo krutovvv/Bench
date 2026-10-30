@@ -20,7 +20,7 @@ impl BenchApp {
         let at = self.thread_ref(cx);
         let host = self.thread_host(&at);
         let link = self.agents.get(&host);
-        let connected = link.is_some_and(|a| a.conn.is_some()) || self.demo;
+        let connected = link.is_some_and(|a| a.conn.is_some());
         let error = link.and_then(|a| a.error.clone());
         // Always shown, healthy or not: the person decides whether to look, not a late error.
         let working = self
@@ -59,8 +59,7 @@ impl BenchApp {
                         // Its sections pad themselves, so their rules run edge to edge as a
                         // Mac popover's separators do (the panel's own padding inset them).
                         .p_0()
-                        // `BENCH_DEMO_POP=agent`: open from the start, for its picture.
-                        .default_open(std::env::var("BENCH_DEMO_POP").as_deref() == Ok("agent"))
+                        .default_open(self.sidebar.agent_popover_open)
                         .trigger(
                             // Opening the panel asks macOS what it allows now (the choice may
                             // have changed in System Settings since the start).

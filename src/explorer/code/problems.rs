@@ -83,12 +83,6 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.demo {
-            let post = "/Users/demo/code/blog/content/posts/release-2-4.md";
-            let found = vec![(post.to_string(), crate::demo::file_problems(post))];
-            self.explorer.problems.insert(project, Some(found));
-            return;
-        }
         let Some((conn, id)) = self.env_target(&project) else {
             return;
         };

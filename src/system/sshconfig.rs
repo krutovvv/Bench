@@ -82,6 +82,9 @@ fn blocks(lines: &[&str]) -> Vec<(usize, usize, Vec<String>)> {
 
 /// Every concrete host (no wildcards) of `~/.ssh/config`, in file order.
 pub fn load() -> Vec<Server> {
+    if let Some(fake) = crate::client::fake::fake() {
+        return fake.ssh_servers();
+    }
     load_from(&path())
 }
 

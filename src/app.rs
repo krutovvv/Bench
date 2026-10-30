@@ -72,10 +72,6 @@ pub struct BenchApp {
     /// What waits for a second press (a delete, closing an unsaved tab): `armed.rs`.
     pub armed: armed::Armed,
 
-    /// A made-up session for screenshots (`BENCH_DEMO=1`, src/demo/mod.rs): nothing is connected.
-    pub demo: bool,
-    /// The demo's own data (`demo/mod.rs`).
-    pub demo_state: crate::demo::DemoState,
     pub appearance: bench_ui::theme::Appearance,
 
     /// What the middle of the window shows (`workspace.rs`).
@@ -112,10 +108,6 @@ impl BenchApp {
 
         let app = cx.weak_entity();
         let active_thread = cx.new(|cx| ThreadView::new(app, window, cx));
-        if let Ok(v) = std::env::var("BENCH_PREFILL") {
-            let composer = active_thread.read(cx).composer.clone();
-            composer.update(cx, |s, cx| s.set_value(v, window, cx));
-        }
         let sidebar = crate::sidebar::state::SidebarState::new(window, cx);
         let new_project = crate::settings::new_project::NewProject::new(window, cx);
         let subs = Self::subscriptions(&sidebar.search, &new_project.path, window, cx);
@@ -150,20 +142,10 @@ impl BenchApp {
             beside_thread: None,
             explorer: Default::default(),
             _slash_keys: None,
-            demo: false,
-            demo_state: Default::default(),
             _subscriptions: subs,
             _tasks: tasks,
         };
-        // The browser build is always the demo: there is nothing to connect to there.
-        if cfg!(target_family = "wasm") || std::env::var("BENCH_DEMO").is_ok() {
-            crate::demo::load(&mut app, cx);
-            if app.center == crate::workspace::Center::Settings {
-                app.load_providers(window, cx);
-            }
-        } else {
-            app.connect_agent(String::new(), window, cx);
-        }
+        app.connect_agent(String::new(), window, cx);
         app
     }
 

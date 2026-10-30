@@ -205,7 +205,7 @@ impl ThreadView {
                         .gap_1()
                         .items_center()
                         .when(
-                            !(tplay || tspeak) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
+                            !(tplay || tspeak) && !self.tools_shown,
                             |s| {
                                 let shown = self.reveal_tail.as_deref() == Some(ak.as_str());
                                 s.when(!shown, |s| {

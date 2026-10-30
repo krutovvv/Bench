@@ -34,17 +34,12 @@ pub struct BrowserState {
     pub touched: Option<web_time::Instant>,
     /// An insert whose tab is being opened again: the next new tab is its.
     pub reopening: Option<String>,
-    /// The demo's tab: a picture.
-    pub demo_frame: Option<Arc<RenderImage>>,
 }
 
 impl BenchApp {
     /// /browser shows the server browser's tab: offered where the thread's environment has that
     /// browser's MCP server (a project's own, or Host's), not where another browser works.
     pub fn browser_offered(&self, at: &ThreadRef) -> bool {
-        if self.demo {
-            return true;
-        }
         match self.places.projects.iter().find(|p| p.id == at.project) {
             Some(p) => p.browser,
             None => self.places.host_browser,
@@ -77,10 +72,6 @@ impl BenchApp {
                 return Some(b.clone());
             }
             self.inserts.browser.conn = None;
-        }
-        // The demo's steps are pictures; nothing connects.
-        if self.demo {
-            return None;
         }
         let (tx, rx) = async_channel::bounded::<()>(1);
         self.inserts.browser.error = None;
@@ -227,9 +218,6 @@ impl BenchApp {
 
     /// The thread's tab's picture: the live frame (live: it streams now).
     pub fn tab_frame(&self, tab: &str) -> Option<(Arc<RenderImage>, f32, f32, bool)> {
-        if self.demo {
-            return self.inserts.browser.demo_frame.clone().map(|f| (f, 0., 0., false));
-        }
         let b = self.inserts.browser.conn.as_ref()?;
         let s = b.state.lock().unwrap();
         let shot = s.shots.get(tab)?;

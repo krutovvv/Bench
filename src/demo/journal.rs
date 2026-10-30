@@ -1,23 +1,11 @@
-//! The made-up pieces of a thread: rows of the sidebar, steps of the agent's work, a journal as Pi
-//! gives it, the answer's media.
+//! The made-up pieces of a thread: steps of the agent's work, a journal as Pi gives it, the
+//! answer's media.
 
-use crate::thread::store::ThreadRow;
-use ::thread::Thread;
 use protocol::{Process, ThreadItem, ThreadOpen};
 use serde_json::{Value, json};
 
-pub(super) fn demo_file(name: &str) -> String {
+fn demo_file(name: &str) -> String {
     format!("{}/assets/demo/{name}", env!("CARGO_MANIFEST_DIR"))
-}
-
-pub(super) fn row(id: &str, title: &str, running: bool, source: &str) -> ThreadRow {
-    ThreadRow {
-        id: id.into(),
-        title: title.into(),
-        running,
-        source: source.into(),
-        ..Default::default()
-    }
 }
 
 /// A made-up step of the agent's work: a tool, what it acted on, its arguments, an edit's diff.
@@ -188,12 +176,14 @@ impl Journal {
             .collect();
     }
 
-    pub(super) fn thread(self) -> Thread {
-        Thread::open(ThreadOpen {
+    /// The thread as `thread.open` answers it.
+    pub(super) fn open(self) -> ThreadOpen {
+        ThreadOpen {
             items: self.items,
             processes: self.processes,
+            head: self.seq,
             ..Default::default()
-        })
+        }
     }
 }
 

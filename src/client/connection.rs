@@ -35,9 +35,21 @@ pub struct Connection {
     pub base: String,
     token: String,
     _tunnel: Option<Tunnel>,
+    /// What answers its REST calls when no real agent is there (`client/fake.rs`).
+    pub(crate) fake: Option<std::sync::Arc<dyn crate::client::fake::FakeAgent>>,
 }
 
 impl Connection {
+    /// The connection to a fake agent: nothing is opened.
+    pub fn to_fake(agent: std::sync::Arc<dyn crate::client::fake::FakeAgent>) -> Self {
+        Self {
+            base: String::new(),
+            token: String::new(),
+            _tunnel: None,
+            fake: Some(agent),
+        }
+    }
+
     pub fn open(target: &Target) -> Result<Self> {
         match target {
             Target::Local => Self::open_local(),
@@ -51,6 +63,7 @@ impl Connection {
             base: format!("http://127.0.0.1:{port}"),
             token,
             _tunnel: None,
+            fake: None,
         })
     }
 
@@ -129,6 +142,7 @@ impl Connection {
             base,
             token: token.into(),
             _tunnel: Some(tunnel),
+            fake: None,
         })
     }
 }
@@ -244,6 +258,9 @@ fn tail_last(path: &std::path::Path, bytes: u64, lines: usize) -> String {
 /// The last lines of the agent's own log (`~/.bench/server.log` where it runs): what it says
 /// before the status has anything to say. Silent when there is no log yet or the host is away.
 pub fn agent_log(target: &Target, lines: usize) -> Vec<String> {
+    if let Some(fake) = crate::client::fake::fake() {
+        return fake.agent_log();
+    }
     let raw = match target {
         Target::Local => tail_last(
             &crate::client::launch::agent_home().join("server.log"),
@@ -272,6 +289,9 @@ pub fn agent_log(target: &Target, lines: usize) -> Vec<String> {
 
 /// Run `git -C dir args…` where the agent lives (this Mac, or the SSH host); stdout trimmed.
 pub fn git(target: &Target, dir: &str, args: &[&str]) -> Result<String> {
+    if let Some(fake) = crate::client::fake::fake() {
+        return fake.git(dir, args);
+    }
     let out = match target {
         Target::Local => Command::new("git").arg("-C").arg(dir).args(args).output()?,
         Target::Ssh(host) => {
