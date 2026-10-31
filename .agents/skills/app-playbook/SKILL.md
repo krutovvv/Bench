@@ -63,9 +63,9 @@ Each sibling sends what it learned back here. Bench's own skills say how Bench d
 | A test folder for the real database | A data directory the tests and scripts override. Never run the app on real data |
 | A port is taken in a preview | Another project's server may hold it. Do not kill it: use another port |
 | A shell script with a variable called `path` | In zsh it is tied to `PATH`, and the script stops finding commands. Prove a check fails on a break before trusting it |
-| Expose an app to agents | An MCP server over stdio, started on demand, no port, one JSON object per line split on `\n` only. Hold every call to the tool's own schema before it runs: Doings' `src/mcp/tools.rs` (`check_arguments`) |
+| Expose an app to agents | An MCP server over stdio, started on demand, no port, one JSON object per line split on `\n` only. Hold every call to the tool's own schema before it runs: `check_arguments` in Doings' MCP server |
 | A weak model sends the wrong type | A silent ignore looks like success, and it repeats itself. Refuse in words what could mean something else, and accept what is unmistakable: a number for a text parameter is text, as an error alone did not stop it |
-| Several processes on one SQLite file | WAL and a busy timeout. Reload on `PRAGMA data_version`, drop undo when another process wrote, migrations only add. An older binary still running resets a newer column on rows it rewrites: `src/store/SPEC.md` in Doings |
+| Several processes on one SQLite file | WAL and a busy timeout. Reload on `PRAGMA data_version`, drop undo when another process wrote, migrations only add. An older binary still running resets a newer column on rows it rewrites: the store's spec in Doings |
 | Renaming an installed app and its data | Back up, stop the window, move the bundle away first so no client can recreate the old folder, rename the folder with `-wal` and `-shm` together, install, switch clients. An open connection keeps working. Rehearse on a copy |
 | A browser demo that looks like a picture of an app | Compile the app itself and let it fill the tab. No window drawn around it, nothing floating over it, no room kept for traffic lights, the system's theme, no sidebar on a phone |
 | A refactor | Take pictures before and after and compare pixels. Differences allowed: window focus, a caret, clocks, a hover from the real mouse |
