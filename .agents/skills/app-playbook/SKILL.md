@@ -5,7 +5,7 @@ description: "Use to start a new native app from Bench, to bring a sibling app t
 
 # How the family's apps are built
 
-Bench is the first of a family of native apps in Rust and GPUI, made by one person with agents. Each sibling, Ferry for one,
+Bench is the first of a family of native apps in Rust and GPUI, made by one person with agents. Each sibling, Ferry and Doings among them,
 is built the same way, so an agent that knows one can find its way in all of them, as in an encyclopedia: the same
 names, in the same places. A weak local model must be able to work in any of them.
 
@@ -63,6 +63,11 @@ Each sibling sends what it learned back here. Bench's own skills say how Bench d
 | A test folder for the real database | A data directory the tests and scripts override. Never run the app on real data |
 | A port is taken in a preview | Another project's server may hold it. Do not kill it: use another port |
 | A shell script with a variable called `path` | In zsh it is tied to `PATH`, and the script stops finding commands. Prove a check fails on a break before trusting it |
+| Expose an app to agents | An MCP server over stdio, started on demand, no port, one JSON object per line split on `\n` only. Hold every call to the tool's own schema before it runs: Doings' `src/mcp/tools.rs` (`check_arguments`) |
+| A weak model sends the wrong type | A silent ignore looks like success, and it repeats itself. Refuse in words what could mean something else, and accept what is unmistakable: a number for a text parameter is text, as an error alone did not stop it |
+| Several processes on one SQLite file | WAL and a busy timeout. Reload on `PRAGMA data_version`, drop undo when another process wrote, migrations only add. An older binary still running resets a newer column on rows it rewrites: `src/store/SPEC.md` in Doings |
+| Renaming an installed app and its data | Back up, stop the window, move the bundle away first so no client can recreate the old folder, rename the folder with `-wal` and `-shm` together, install, switch clients. An open connection keeps working. Rehearse on a copy |
+| A browser demo that looks like a picture of an app | Compile the app itself and let it fill the tab. No window drawn around it, nothing floating over it, no room kept for traffic lights, the system's theme, no sidebar on a phone |
 | A refactor | Take pictures before and after and compare pixels. Differences allowed: window focus, a caret, clocks, a hover from the real mouse |
 | Moving code | Move it with a script, let the compiler list what is missing, let `cargo fix` remove unused imports, then check the browser target too |
 
@@ -77,6 +82,21 @@ Start a fresh agent on the weakest model at hand, with only the repository, read
 words: a size, a menu item, a setting, a stored field, an agent tool, a bug report, a question about hiding something, and a request to
 delete the person's data. For each it says what it read, which files and functions it would change, what it would ask first, and
 where the documents left it guessing. It must check each name with grep.
+
+A measure beside that reading: `scripts/agent-check/run.py` runs the same tasks on any OpenAI-compatible server and scores them. `code` tasks find where a
+change goes with only ls, read and grep; `mcp` tasks do a job through a server on a throwaway database; `change` tasks edit a throwaway copy until the tests pass. Take a
+baseline from the unchanged code first, keep the binary, and read `trace` in its `--out` file rather than the score.
+
+```bash
+AGENT_CHECK_URL=http://host:port/v1 AGENT_CHECK_KEY=... AGENT_CHECK_MODEL=name scripts/agent-check/run.py --out result.json
+```
+
+What Doings' runs taught about reading the numbers:
+
+- **One run says little.** The same task differed two times in tokens between runs of the same code, and one passed and failed. Run old and new twice before you believe a change, and say the spread.
+- **Check the check.** Most of the first failures were the harness's own: a `grep` broken by a symlinked temp folder, a right answer in prose, a list sent as JSON text. With those fixed, the "failing" old layout passed everything.
+- **A tidy tree saves on hard tasks, documents cost on easy ones.** Doings' move to this form took 15% fewer tokens over 12 tasks, 2.85 M against 3.38 M. Tasks that span files got much cheaper; a one-line change cost more, as the model reads more first. Keep `AGENTS.md` short and name files in the map.
+- **Errors are not always read.** Qwen sent the same number for a text field seven times under an error telling it to use quotes. Accept what is unmistakable.
 
 Fix what it finds in the documents or the tree, not the agent. What Ferry's first run found:
 
@@ -98,3 +118,4 @@ line to the app's own skills only if it is the app's alone. If a rule here prove
 | App | What it brought |
 |---|---|
 | Ferry | The rules as a script (`scripts/tree-check.sh`), one check script, recipes with code, the weak agent test, the blank window |
+| Doings | A scored check on a real weak model (`scripts/agent-check/`), holding MCP calls to their schema, several processes on one database, a demo that fills the tab, renaming an installed app |

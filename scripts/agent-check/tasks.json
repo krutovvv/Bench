@@ -1,0 +1,16 @@
+{
+  "code": [
+    {"name": "spacing-scale", "ask": "Change the spacing step every screen uses for the gap between buttons of a row.", "needs": [["pub enum Gap"]]},
+    {"name": "composer-height", "ask": "Let the composer grow to more lines before it scrolls inside.", "needs": [["COMPOSER_MAX_LINES"]]},
+    {"name": "light-palette", "ask": "Change a color of Bench's light theme.", "needs": [["BENCH_LIGHT"]]},
+    {"name": "new-insert", "ask": "Add a new insert, /calc, a small calculator put into a thread.", "needs": [["trait InsertKind"]]},
+    {"name": "new-document-kind", "ask": "Add a new kind of document that opens in a tab in the Explorer: a picture viewer.", "needs": [["enum DocKey"]]},
+    {"name": "dock-panel", "ask": "Add a new panel to a dock of the window.", "needs": [["enum Panel"]]},
+    {"name": "project-drag", "ask": "Change how a project dragged in the sidebar decides whether it lands above or below another.", "needs": [["fn drop_zone"]]},
+    {"name": "env-section", "ask": "Add a new section to a project's Settings page.", "needs": [["FORMS"]]},
+    {"name": "fork-order", "ask": "Change how a forked thread is shown under its parent in the sidebar.", "needs": [["fn nest_forks"]]},
+    {"name": "telegram-mark", "ask": "Change the mark that shows a project has a Telegram bot.", "needs": [["fn telegram_mark"]]},
+    {"name": "back-forward", "ask": "Change what the back and forward buttons in the title bar remember.", "needs": [["NavHistory"]]},
+    {"name": "click-focus", "ask": "A button inside the thread takes the focus away from the composer's click handling. Find the helper that stops a press from reaching the thread.", "needs": [["fn own_press"]]}
+  ]
+}

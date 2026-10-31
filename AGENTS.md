@@ -83,6 +83,8 @@ our code, with a comment saying so.
 2. Run the checks: `scripts/tree-check.sh` (what it lists over 500 lines is the next thing to cut, the rest must be clean),
    `cargo build` with zero warnings, `cargo test --workspace`, and for the agent
    `cd agent && node --test --test-timeout=60000 test/*.test.ts`.
+   After moving code or changing a skill, `scripts/agent-check/run.py` says whether a weak model still
+   finds its way (`app-playbook`).
 3. One change, one commit.
 4. `scripts/bundle-macos.sh` rebuilds `/Applications/Bench.app`, at once, with no need to ask.
 5. Tell the person: "собрано — перезапусти Bench".

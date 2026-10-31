@@ -27,7 +27,8 @@ Find the row for your change, open that file, and look at its folder too.
 | change a kind of row in the thread (a question, the plan, processes, changed files, pages read) | `src/thread/rows/` (`asks.rs`, `clarify.rs`, `processes.rs`, `changed_files.rs`, `pages.rs`) |
 | change the bottom dock's terminals (⌃`, ⌘T, the tabs) | `src/inserts/terminal/panel.rs` (the shell itself: `session.rs`, `view.rs`) |
 | change an insert (`/terminal`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
-| add an insert | `.agents/skills/bench-kit/references/build-insert.md` |
+| add an insert | a new folder `src/inserts/<kind>/` (`mod.rs` implements `InsertKind`), its line in `KINDS` in `src/inserts/mod.rs`. Copy a short sibling; the steps: `.agents/skills/bench-kit/references/build-insert.md` |
+| add a kind of document in the Explorer's tabs | a `DocKey` variant in `src/explorer/pane/doc.rs`, its `Item` in `src/explorer/pane/item.rs` |
 | change a project's Settings (name, where, model, Telegram) or its parts (MCP, language servers, schedule) | `src/env/<section>.rs` (`mcp/`, `schedule.rs`, `telegram.rs`…); the page `src/env/page.rs`; a new section: `src/env/mod.rs` header |
 | export a project's environment to a file or import one (backups, a move to another project) | `src/env/backup.rs` (the Settings rows, the save and open dialogs, the alert); the agent packs and unpacks it in `agent/src/modules/backup.ts` (test `agent/test/backup.test.ts`) |
 | change the Explorer (the tree and its menus, documents, tabs, ⌘P, ⌘⇧F) | `src/explorer/`: `mod.rs` its state; `tree/` the tree (`view.rs` drawn, `parts.rs` the project's parts, `menus.rs` its context menus, `ops.rs` listing, new/rename/delete); `pane/` the middle as Zed's pane (`doc.rs` the tabs' keys and open/close/save, `item.rs` a document as Zed's `Item` — a new kind of document is a `DocKey` variant and its `Item` —, `file.rs` a file in an editor, `tabs.rs`, `view.rs`, `persistence.rs` kept between starts); `search/` (`file_finder.rs` ⌘P, `project_search.rs` ⌘⇧F); `code/` (`lsp.rs` problems, hover and definition, `problems.rs` the Problems tab ⌘⇧M, `git.rs` changed lines and a file's diff, `lang.rs` a file's language); its pieces `crates/ui/src/ide.rs`; the agent's `/api/fs/*` in `agent/src/modules/files.ts`; why: `src/explorer/SPEC.md` |
@@ -75,6 +76,8 @@ Find the row for your change, open that file, and look at its folder too.
 | change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts`; grep, glob, ls: `agent/src/builtin/search.ts` |
 | change a project's language servers (diagnostics after every edit `agent/src/builtin/diagnostics.ts`; the editor's problems, hover, definition via `agent/src/modules/lsp.ts`) | `agent/src/lsp/lsp.ts`, the presets in `agent/src/lsp/presets.ts`; the section `src/env/lsp.rs` |
 | change when a project's conversations are compacted | `compactionPolicy` in `agent/src/config.ts`; the row in `src/env/run.rs` |
+| check a weak model can still work here, add a task for it | `scripts/agent-check/` (`tasks.json`); what it has taught: the skill `app-playbook` |
+| record what a sibling app taught, or look up how the family does a common thing | `.agents/skills/app-playbook/SKILL.md` |
 | change the demo (screenshots) | `src/demo/`: `hooks.rs` (`DemoHooks`: a hook's variable and doc comment, read once at start), `script.rs` (what the hooks ask of the window), `agent.rs` (the fake agent's answers), `env.rs`, `threads.rs`, `journal.rs` (fixtures), `probes.rs` (real input); the seam `src/client/fake.rs`; the table of hooks `.agents/skills/bench-kit/references/build-verification.md`; every state against a reference `.agents/skills/bench-kit/scripts/pixels/` |
 
 ## The tree
@@ -154,7 +157,8 @@ assets/shots/    the README's pictures, made by scripts/readme-shots.sh
 .agents/skills/  bench-kit (how to change Bench), bench-structure (how to grow it), bench-repo (the README,
                  the About box, the web demo, a push), pi-durable-dev-rules, gpui-kit and its guides,
                  rust-best-practices
-scripts/         bundle-macos.sh, build-web.sh, readme-shots.sh, gen_themes.py, specs-check.mjs
+scripts/         bundle-macos.sh, build-web.sh, readme-shots.sh, gen_themes.py, specs-check.mjs,
+                 agent-check/ (can a weak model find its way: tasks.json)
 ```
 
 ## Names worth knowing
