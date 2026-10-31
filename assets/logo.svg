@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Two square-cornered slabs, like the app's own panels: a bench seen from the side, or two
+       lines of a chat. Flat and light like the window. The macOS icon grid: an 824px rounded
+       square on 1024, corners transparent; a hairline edge (fills only: ImageMagick's renderer
+       drops strokes) keeps it apart from a light Dock. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#DEE1E6"/>
+  <rect x="106" y="106" width="812" height="812" rx="179" fill="#FFFFFF"/>
+  <rect x="290" y="300" width="330" height="190" fill="#1F2329"/>
+  <rect x="290" y="534" width="444" height="190" fill="#5C78E2"/>
+</svg>
