@@ -20,6 +20,7 @@ Everything else you need is in skills. Read one with `skill_view` before you nee
 - `pi-durable-dev-rules`: anything in the agent that touches Pi Durable, and how Bench maps onto it.
 - `bench-repo`: before a push, and for the README, its pictures, the About box and the web demo.
 - `gpui-kit`, `rust-best-practices`: the framework and Rust, once the above have no answer.
+- `app-playbook`: what Bench shares with its sibling apps: starting one, common traps, testing with a weak agent.
 
 Why a module is built as it is: its `SPEC.md`, beside its code. The first time you touch a file in a
 module, a note names its spec: read it then. A change that moves a decision updates the spec in the
@@ -79,7 +80,8 @@ our code, with a comment saying so.
 1. Change, `cargo build`, then look at your own copy:
    `.agents/skills/bench-kit/scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=landing`.
    Read the picture. Anything the person sees is not done until you have looked at it.
-2. Run the checks: `cargo build` with zero warnings, `cargo test --workspace`, and for the agent
+2. Run the checks: `scripts/tree-check.sh` (what it lists over 500 lines is the next thing to cut, the rest must be clean),
+   `cargo build` with zero warnings, `cargo test --workspace`, and for the agent
    `cd agent && node --test --test-timeout=60000 test/*.test.ts`.
 3. One change, one commit.
 4. `scripts/bundle-macos.sh` rebuilds `/Applications/Bench.app`, at once, with no need to ask.

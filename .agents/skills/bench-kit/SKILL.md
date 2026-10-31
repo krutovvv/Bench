@@ -77,11 +77,11 @@ The loop is in `AGENTS.md`. What it needs beyond that:
 
 - The demo is a fake agent. Every hook (`BENCH_DEMO=env`, `BENCH_PANEL=providers`,
   `BENCH_DEMO_DRAG=…`) is in one table in `references/build-verification.md`. Every demo state
-  against a reference, for a change to many screens: `scripts/pixels/`.
+  against a reference, for a change to many screens: `.agents/skills/bench-kit/scripts/pixels`.
 - The picture is taken by macOS's `screencapture`. No picture while the copy started ("no window
   for pid", nothing in its log): ask the person to allow Bench in Privacy & Security → Screen &
   System Audio Recording, once.
-- From outside Bench, `scripts/ship.sh` quits Bench the honest way, rebuilds it and opens it.
+- From outside Bench, `.agents/skills/bench-kit/scripts/ship.sh` quits Bench the honest way, rebuilds it and opens it.
 - A Bench opened while the bundle is being written starts on half of it: build again.
 
 ## Pages

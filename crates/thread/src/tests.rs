@@ -1,3 +1,5 @@
+//! The rules of what a thread shows, as tests.
+
 use protocol::{
     PlanStep, Process, ProcessState, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen,
 };

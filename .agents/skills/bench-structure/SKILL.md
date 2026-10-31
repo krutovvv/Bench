@@ -207,6 +207,7 @@ metadata:
 
 ## Где ещё смотреть
 
+- скилл `app-playbook` — что общего у Bench и его приложений-соседей; `scripts/tree-check.sh` — правила этого скилла как проверка.
 - `AGENTS.md` — как здесь работать; скилл `bench-concepts` — понятия Bench.
 - скилл `bench-map` — где лежит то, что нужно поменять.
 - `references/architecture.md` этого скилла — почему так; `src/explorer/SPEC.md` — окно и Explorer, фазы IDE.
